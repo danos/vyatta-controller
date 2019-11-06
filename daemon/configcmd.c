@@ -78,10 +78,7 @@ suppress_intf_cmd(const char *iface)
 		return false;
 
 	zhash_t *coll = get_intf_coll();
-	/* note: "ALL" can be removed once configuration
-	 * ends using this keyword for a hint
-	 */
-	if (!streq(iface, "ALL") &&
+	if (strcasecmp(iface, "ALL") &&
 	    !zhash_lookup(coll, iface))
 		return true;
 	return false;

@@ -2,7 +2,7 @@
  * Track netlink messages, maintaining current state
  * of interfaces, addresses and routes
  *
- * Copyright (c) 2018-2019, AT&T Intellectual Property. All rights reserved.
+ * Copyright (c) 2017-2019 AT&T Intellectual Property.  All rights reserved.
  * Copyright (c) 2012-2017 by Brocade Communications Systems, Inc.
  * All rights reserved.
  *
@@ -43,7 +43,9 @@ typedef int (snapshot_callback) (
 struct _snapshot {
 	uint64_t last_seqno;
 
+#ifdef RTNLGRP_RTDMN
 	zhash_t *vrf;
+#endif
 	zhash_t *link;
 	zhash_t *vlan;
 	zhash_t *bridge_link;
@@ -54,12 +56,13 @@ struct _snapshot {
 	zhash_t *xfrm;
 	zhash_t *l2tp_tunnel;
 	zhash_t *l2tp_session;
-	zhash_t *team_slave;
+	zhash_t *slave_link;
 	zhash_t *team_select;
 	zhash_t *team_mode;
 	zhash_t *team_recipe;
 	zhash_t *team_port;
 	zhash_t *team_activeport;
+	zhash_t *vrf_master;
 	zhash_t *qdisc;
 	zhash_t *filter;
 	zhash_t *chain;
@@ -75,7 +78,9 @@ void snapshot_destroy(snapshot_t **selfp)
 	snapshot_t *self = *selfp;
 
 	if (self) {
+#ifdef RTNLGRP_RTDMN
 		zhash_destroy(&self->vrf);
+#endif
 		zhash_destroy(&self->link);
 		zhash_destroy(&self->vlan);
 		zhash_destroy(&self->bridge_link);
@@ -86,12 +91,13 @@ void snapshot_destroy(snapshot_t **selfp)
 		zhash_destroy(&self->xfrm);
 		zhash_destroy(&self->l2tp_tunnel);
 		zhash_destroy(&self->l2tp_session);
-		zhash_destroy(&self->team_slave);
+		zhash_destroy(&self->slave_link);
 		zhash_destroy(&self->team_select);
 		zhash_destroy(&self->team_mode);
 		zhash_destroy(&self->team_recipe);
 		zhash_destroy(&self->team_port);
 		zhash_destroy(&self->team_activeport);
+		zhash_destroy(&self->vrf_master);
 		zhash_destroy(&self->qdisc);
 		zhash_destroy(&self->filter);
 		zhash_destroy(&self->chain);
@@ -106,7 +112,9 @@ snapshot_t *snapshot_new(void)
 
 	if (self) {
 		self->last_seqno = 0;
+#ifdef RTNLGRP_RTDMN
 		self->vrf = zhash_new();
+#endif
 		self->link = zhash_new();
 		self->vlan = zhash_new();
 		self->bridge_link = zhash_new();
@@ -117,12 +125,13 @@ snapshot_t *snapshot_new(void)
 		self->xfrm = zhash_new();
 		self->l2tp_tunnel = zhash_new();
 		self->l2tp_session = zhash_new();
-		self->team_slave = zhash_new();
+		self->slave_link = zhash_new();
 		self->team_select = zhash_new();
 		self->team_mode = zhash_new();
 		self->team_recipe = zhash_new();
 		self->team_port = zhash_new();
 		self->team_activeport = zhash_new();
+		self->vrf_master = zhash_new();
 		self->qdisc = zhash_new();
 		self->filter = zhash_new();
 		self->chain = zhash_new();
@@ -130,11 +139,14 @@ snapshot_t *snapshot_new(void)
 		if (!self->link || !self->vlan || !self->bridge_link ||
 		    !self->address || !self->route || !self->neighbour ||
 		    !self->netconf || !self->xfrm || !self->l2tp_tunnel ||
-		    !self->l2tp_session || !self->team_slave ||
+		    !self->l2tp_session || !self->slave_link ||
 		    !self->team_select || !self->team_mode ||
 		    !self->team_recipe || !self->team_port ||
-		    !self->team_activeport || !self->vrf || !self->qdisc ||
-		    !self->filter || !self->chain)
+		    !self->team_activeport || !self->vrf_master ||
+#ifdef RTNLGRP_RTDMN
+		    !self->vrf ||
+#endif
+		    !self->qdisc || !self->filter || !self->chain)
 			snapshot_destroy(&self);
 	}
 
@@ -179,17 +191,57 @@ static int is_team_msg(const char *key)
 	return strstr(key, "team") != NULL;
 }
 
-static int is_team_slave(const struct nlmsghdr *nlh)
+static int is_vrf_master(const struct nlmsghdr *nlh)
 {
 	struct nlattr *tb[IFLA_MAX+1] = { NULL };
+	struct nlattr *linkinfo[IFLA_INFO_MAX+1] = { NULL };
 	int ret;
 
 	ret = mnl_attr_parse(nlh, sizeof(struct ifinfomsg), link_attr, tb);
 	if (ret != MNL_CB_OK)
 		return 0;
 
-	if (tb[IFLA_MASTER])
-		return 1;
+	if (!tb[IFLA_LINKINFO])
+		return 0;
+
+	if (mnl_attr_parse_nested(tb[IFLA_LINKINFO],
+				  linkinfo_attr, linkinfo) != MNL_CB_OK)
+		return 0;
+
+	if (linkinfo[IFLA_INFO_KIND]) {
+		if (!strncmp(mnl_attr_get_str(linkinfo[IFLA_INFO_KIND]),
+			     "vrf", 3))
+			return 1;
+	}
+
+	return 0;
+}
+
+static int is_slave(const struct nlmsghdr *nlh)
+{
+	struct nlattr *tb[IFLA_MAX+1] = { NULL };
+	struct nlattr *linkinfo[IFLA_INFO_MAX+1] = { NULL };
+	int ret;
+
+	ret = mnl_attr_parse(nlh, sizeof(struct ifinfomsg), link_attr, tb);
+	if (ret != MNL_CB_OK)
+		return 0;
+
+	if (tb[IFLA_MASTER]) {
+		if (!tb[IFLA_LINKINFO])
+			return 0;
+
+		if (mnl_attr_parse_nested(tb[IFLA_LINKINFO],
+					  linkinfo_attr, linkinfo) != MNL_CB_OK)
+			return 0;
+
+		if (linkinfo[IFLA_INFO_SLAVE_KIND])
+			if (!strncmp(mnl_attr_get_str(
+				linkinfo[IFLA_INFO_SLAVE_KIND]), "team", 4) ||
+			    !strncmp(mnl_attr_get_str(
+				linkinfo[IFLA_INFO_SLAVE_KIND]), "bridge", 6))
+				return 1;
+	}
 
 	return 0;
 }
@@ -867,12 +919,15 @@ static void snapshot_handle_non_xfrm_msg(snapshot_t *self, nlmsg_t *nmsg)
 			/* these are all AF_BRIDGE - see link_topic() */
 			zhash_update(self->bridge_link, key, nmsg);
 			zhash_freefn(self->bridge_link, key, free_nmsg);
-		} else if (is_team_slave(nlh)) {
-			update_with_newlink(self->team_slave, key, nmsg);
+		} else if (is_slave(nlh)) {
+			update_with_newlink(self->slave_link, key, nmsg);
+			zhash_delete(self->link, key);
+		} else if (is_vrf_master(nlh)) {
+			update_with_newlink(self->vrf_master, key, nmsg);
 			zhash_delete(self->link, key);
 		} else {
 			update_with_newlink(self->link, key, nmsg);
-			zhash_delete(self->team_slave, key);
+			zhash_delete(self->slave_link, key);
 		}
 		break;
 
@@ -881,8 +936,10 @@ static void snapshot_handle_non_xfrm_msg(snapshot_t *self, nlmsg_t *nmsg)
 			zhash_delete(self->vlan, key);
 		else if (is_bridge_link(key))
 			zhash_delete(self->bridge_link, key);
-		else if (is_team_slave(nlh))
-			zhash_delete(self->team_slave, key);
+		else if (is_slave(nlh))
+			zhash_delete(self->slave_link, key);
+		else if (is_vrf_master(nlh))
+			zhash_delete(self->vrf_master, key);
 		else {
 			if (is_team_master(nlh))
 				delete_dependent_team_entries(self, key);
@@ -1154,12 +1211,15 @@ void snapshot_send(snapshot_t *self, void *socket, zframe_t *to)
 {
 	target_t target = { socket, to };
 
+#ifdef RTNLGRP_RTDMN
 	snapshot_iterator(self->vrf, send_nmsg, &target, false);
+#endif
+	snapshot_iterator(self->vrf_master, send_nmsg, &target, true);
 	snapshot_iterator(self->link, send_nmsg, &target, true);
 	snapshot_iterator(self->team_mode, send_nmsg, &target, false);
 	snapshot_iterator(self->team_recipe, send_nmsg, &target, false);
 	snapshot_iterator(self->team_port, send_nmsg, &target, false);
-	snapshot_iterator(self->team_slave, send_nmsg, &target, true);
+	snapshot_iterator(self->slave_link, send_nmsg, &target, true);
 	snapshot_iterator(self->vlan, send_nmsg, &target, true);
 	snapshot_iterator(self->bridge_link, send_nmsg, &target, false);
 	snapshot_iterator(self->address, send_nmsg, &target, false);

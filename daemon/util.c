@@ -53,11 +53,13 @@ void __panic(const char *funcname, const char *format, ...)
 /* Startup problem */
 void die(const char *format, ...)
 {
+	char line[1024];
 	va_list ap;
 
 	va_start(ap, format);
-	vfprintf(stderr, format, ap);
+	vsnprintf(line, sizeof(line), format, ap);
 	va_end(ap);
+	syslog(LOG_ERR, "fatal: %s", line);
 	exit(EXIT_FAILURE);
 }
 
