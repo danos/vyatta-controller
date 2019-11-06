@@ -1,0 +1,27 @@
+#! /usr/bin/make -f
+
+# Use hardening options
+#
+# This breaks the unit-test cases, but there is a workaround over in the
+# UT makefile.
+#
+export DEB_BUILD_HARDENING=1
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+ifeq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
+export DEB_CFLAGS_MAINT_STRIP=-O2
+export DEB_CXXFLAGS_MAINT_STRIP=-O2
+export DEB_CFLAGS_MAINT_APPEND=-O3
+export DEB_CXXFLAGS_MAINT_APPEND=-O3
+endif
+
+%:
+	dh $@ --parallel --with systemd
+
+# No changelog
+override_dh_installchangelogs:
+
+override_dh_strip:
+	dh_strip --dbg-package=vplane-controller-dbg

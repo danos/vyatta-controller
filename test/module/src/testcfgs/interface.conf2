@@ -1,0 +1,6 @@
+# test interface.conf2
+s201	pci-address	0000:00:01.0
+s202	pci-slot	2
+s203	mac		00:00:00:00:00:03
+s204	port		4
+s205	firmware-index	5

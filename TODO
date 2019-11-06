@@ -1,0 +1,5 @@
+* Implement Statistics message?
+
+* Add Man pages
+
+* Dynamic reconfigure of broker on SIGUSR1

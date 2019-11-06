@@ -1,0 +1,19 @@
+//
+// Copyright (c) 2018-2019, AT&T Intellectual Property.  All rights reserved.
+//
+// SPDX-License-Identifier: LGPL-2.1-only
+//
+
+syntax="proto2";
+
+message VPlanedEnvelope {
+	required string key = 1;       //persistence key
+	optional string interface = 2; //interface hint
+	enum Action {
+	     SET = 0;
+	     DELETE = 1;
+	     UPDATE = 2;
+	}
+	required Action action = 3;   //configuration action
+	required bytes msg = 4;       //Dataplane envelope + message
+}

@@ -1,0 +1,60 @@
+Source: vplane-controller
+Section: net
+Priority: optional
+Maintainer: Vyatta Package Maintainers <DL-vyatta-help@att.com>
+Build-Depends: debhelper (>= 9),
+ libinih-dev,
+ libmnl-dev,
+ libzmq3-dev (>= 4.0),
+ libczmq-dev,
+ libedit-dev,
+ libjson-c-dev (>= 0.10),
+ libvrfmanager-vyatta-dev (>= 2.4),
+ cpputest (>= 3.8),
+ pkg-config,
+ debhelper (>= 9.20160709) | dh-systemd,
+ bvnos-linux-libc-dev,
+ libb64-dev,
+ protobuf-c-compiler,
+ protobuf-compiler,
+ libprotobuf-c-dev,
+ perl (>= 5.8.8),
+ libgoogle-protocolbuffers-perl,
+ libsystemd-dev,
+Standards-Version: 3.9.6
+
+Package: libvplaned-dev
+Architecture: any
+Priority: optional
+Section: libdevel
+Depends: ${misc:Depends}
+Description: Vyatta development package for the controller
+ Development header and library files for the Vyatta controller access
+ library.
+
+Package: vplane-controller
+Architecture: any
+Replaces: vyatta-controller
+Conflicts: vyatta-controller
+Depends: adduser,
+	 ${perl:Depends}, ${shlibs:Depends}, ${misc:Depends}, lsb-base (>= 3.0-6)
+Breaks: vyatta-routing (<= 1:10.11.9), vyatta-dataplane (<= 3.5.42)
+Description: Vyatta dataplane controller
+ Daemon for controlling Vyatta dataplane services.
+
+Package: vplane-controller-dbg
+Architecture: any
+Section: debug
+Depends:
+ vplane-controller (= ${binary:Version}),
+ ${misc:Depends}
+Description: Debugging symbols for vplane-controller
+ Debugging symbols for the vplane-controller package.
+
+Package: libvyatta-controller-proto-support
+Section: devel
+Architecture: all
+Depends: ${misc:Depends}
+Description: Vyatta controller protocol buffer file for language support
+ Perl file needed to build protobuf messages to talk to the controller
+

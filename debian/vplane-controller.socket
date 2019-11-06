@@ -1,0 +1,5 @@
+[Socket]
+ListenStream=/var/run/vyatta/vplaned-config.socket
+
+[Install]
+WantedBy=sockets.target

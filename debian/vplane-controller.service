@@ -1,0 +1,24 @@
+[Unit]
+Description=dataplane controller
+Wants=system-preconfigure.service system-configure.service
+After=system-preconfigure.service
+Before=system-configure.service vyatta-routing.service nsm.service \
+ bgpd.service imi.service mribd.service msdpd.service oamd.service \
+ ospf6d.service ospfd.service pimd.service ribd.service ripd.service \
+ ripngd.service
+ConditionPathExists=/etc/vyatta/controller.conf
+
+[Service]
+Type=notify
+ExecStartPre=-/sbin/modprobe team
+ExecStartPre=-/sbin/modprobe l2tp_netlink
+ExecStartPre=/lib/vplane/hwbinding /config/config.boot
+ExecStartPre=/bin/bash -c "rm -f /var/run/vyatta/*.stats"
+Environment=VPLANED_DEBUG_FLAG=""
+ExecStart=/opt/vyatta/sbin/vplaned ${VPLANED_DEBUG_FLAG} -u vplaned -g adm -l /var/log/vyatta/vplaned.log
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+TimeoutStartSec=90s
+
+[Install]
+WantedBy=config-loaded.target

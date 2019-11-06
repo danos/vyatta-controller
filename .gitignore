@@ -1,0 +1,57 @@
+# Debian rules
+build-stamp
+debian/tmp
+debian/files
+debian/libvplaned-dev/
+debian/vplane-controller/
+debian/vplane-controller-dbg/
+debian/*.log
+debian/*.substvars
+debian/*.debhelper
+debian/debhelper-build-stamp
+# executable
+daemon/vplaned
+client/snapshot
+client/vplsh
+# Test
+test/module/build
+# Normal rules
+.*
+*.o
+*.o.*
+*.a
+*.s
+*.ko
+*.so
+*.so.dbg
+*.mod.c
+*.i
+*.lst
+*.symtypes
+*.order
+modules.builtin
+*.elf
+*.bin
+*.gz
+*.bz2
+*.lzma
+*.xz
+*.lzo
+*.patch
+*.gcno
+#
+# Top-level generic files
+#
+/tags
+/TAGS
+
+# git files that we don't want to ignore even it they are dot-files
+!.gitignore
+
+# cscope files
+cscope.*
+
+*.orig
+*.rej
+*~
+\#*#

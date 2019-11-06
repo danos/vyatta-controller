@@ -1,0 +1,3 @@
+opt/vyatta/bin/
+opt/vyatta/sbin/
+tools/* lib/vplane

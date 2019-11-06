@@ -1,0 +1,132 @@
+#! /usr/bin/perl
+
+# Copyright (c) 2019, AT&T Intellectual Property. All rights reserved.
+# Copyright (c) 2016, Brocade Communications Systems, Inc.
+# All rights reserved.
+#
+# SPDX-License-Identifier: LGPL-2.1-only
+
+# Scan "interfaces dataplane <interface> hardware" and create
+# /etc/vyatta/interfaces.conf.  See the YANG definition for more
+# information about the possible configurations.
+#
+# This file is read by the vyatta-controller to force particular
+# dataplane interfaces to particular names.
+#
+# Each YANG hardware grouping is converted to a triplet in the
+# interfaces.conf file.
+#
+#     <name> <hwbinding_type> <hwbinding_value>
+#
+# An optional .<function> or @<dev-port> may be appended
+# to the hwbinding value (as allowed by the YANG model).
+
+use strict;
+use warnings;
+
+use File::Copy;
+use lib "/opt/vyatta/share/perl5/";
+use XorpConfigParser;
+use Vyatta::Config::Migrate qw(find_nodes);
+
+my $interface_conf = '/etc/vyatta/interface.conf';
+
+sub match_prefix {
+    my ( $name, $prefix ) = @_;
+    my @parts = split / /, $name;
+    return $parts[0] eq $prefix;
+}
+
+# This gets complex it builds a list of matching trees
+# and returns the nodes
+sub lookup_path {
+    my ( $xcp, $path ) = @_;
+    my @components = split / /, $path;
+    my $root       = shift @components;
+    my $trees      = [ [$root] ];
+    return unless $xcp->get_node( $trees->[0] );
+
+    while ( my $elem = shift @components ) {
+        my @matches;
+
+        foreach my $t ( @{$trees} ) {
+            my $head = $xcp->get_node($t);
+            die "can't get [", join( ' ', @{$t} ), "]\n"
+              unless defined($head);
+
+            foreach my $child ( @{ $head->{children} } ) {
+
+                # look for 'dataplane dp0p1p1' , 'dataplane'
+                next unless ( match_prefix( $child->{name}, $elem ) );
+
+                my $subtree = [ @{$t}, $child->{name} ];
+                push @matches, $subtree;
+            }
+        }
+
+        return unless @matches;
+        $trees = \@matches;
+    }
+
+    my @nodes;
+    foreach my $t ( @{$trees} ) {
+        push @nodes, $xcp->get_node($t);
+    }
+    return @nodes;
+}
+
+my $f;
+
+my $config = shift;
+exit 1 unless $config;
+
+my $xcp = new XorpConfigParser();
+$xcp->parse($config);
+
+open $f, '>', $interface_conf
+  or die "can't open $interface_conf";
+
+printf $f "# Automatically generated file; DO NOT EDIT.\n";
+
+foreach my $intf ( lookup_path( $xcp, 'interfaces dataplane' ) ) {
+    ( undef, my $ifname ) = split( ' ', $intf->{name} );
+    $ifname =~ s/^dp\d+//;
+
+    foreach my $hardware ( find_nodes( $xcp, $intf, 'hardware' ) ) {
+        my $dev_port;
+        my $pci_function;
+        my $hwbinding_type;
+        my $hwbinding_value;
+
+        foreach my $child ( @{ $hardware->{children} } ) {
+            ( my $name, my $value ) = split( ' ', $child->{name} );
+
+            if ( $name eq "pci-function" ) {
+                $pci_function = $value;
+            }
+            elsif ( $name eq "dev-port" ) {
+                $dev_port = $value;
+            }
+            else {
+                $hwbinding_type  = $name;
+                $hwbinding_value = $value;
+            }
+        }
+
+        if ( defined $hwbinding_type ) {
+            printf $f "%s\t%s\t%s", $ifname, $hwbinding_type, $hwbinding_value;
+            if ( defined $pci_function ) {
+                printf $f ".%d", $pci_function;
+            }
+            if ( defined $dev_port ) {
+                printf $f "@%d", $dev_port;
+            }
+            printf $f "\n";
+        }
+
+    }
+}
+
+close $f;
+
+exit 0;
