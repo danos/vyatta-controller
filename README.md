@@ -31,7 +31,7 @@ connections).
 
 ## Licensing
 
-The controller is proprietary and cannot be redistributed.
+The controller is licensed under GNU LGPL-2.1.
 
 ## Snapshot Database
 
