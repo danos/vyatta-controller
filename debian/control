@@ -21,6 +21,7 @@ Build-Depends: debhelper (>= 9),
  perl (>= 5.8.8),
  libgoogle-protocolbuffers-perl,
  libsystemd-dev,
+ golang-goprotobuf-dev,
 Standards-Version: 3.9.6
 
 Package: libvplaned-dev
@@ -58,3 +59,8 @@ Depends: ${misc:Depends}
 Description: Vyatta controller protocol buffer file for language support
  Perl file needed to build protobuf messages to talk to the controller
 
+Package: golang-github-danos-vyatta-controller-protobuf-dev
+Architecture: all
+Depends: golang-goprotobuf-dev, ${misc:Depends}
+Description: Provides Go language bindings for the controller API.
+ Go bindings for the controller API.

@@ -6,6 +6,8 @@
 
 syntax="proto2";
 
+option go_package = "github.com/danos/vyatta-controller/protobuf/go/VPlanedEnvelope";
+
 message VPlanedEnvelope {
 	required string key = 1;       //persistence key
 	optional string interface = 2; //interface hint

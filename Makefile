@@ -1,5 +1,5 @@
 DESTDIR=
-SUBDIRS = lib client daemon snmp test/example
+SUBDIRS = lib client daemon snmp test/example protobuf
 CHECK_SUBDIRS=test/module
 CFLAGS += -Wall -Wextra -Werror
 CFLAGS += -Wmissing-prototypes -Wredundant-decls
