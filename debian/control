@@ -3,6 +3,7 @@ Section: net
 Priority: optional
 Maintainer: Vyatta Package Maintainers <DL-vyatta-help@att.com>
 Build-Depends: debhelper (>= 9),
+ dh-exec,
  libinih-dev,
  libmnl-dev,
  libzmq3-dev (>= 4.0),
@@ -22,6 +23,7 @@ Build-Depends: debhelper (>= 9),
  libgoogle-protocolbuffers-perl,
  libsystemd-dev,
  golang-goprotobuf-dev,
+ libprotobuf-dev,
 Standards-Version: 3.9.6
 
 Package: libvplaned-dev
@@ -64,3 +66,17 @@ Architecture: all
 Depends: golang-goprotobuf-dev, ${misc:Depends}
 Description: Provides Go language bindings for the controller API.
  Go bindings for the controller API.
+
+Package: libvyatta-controller-proto1
+Section: devel
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Vyatta controller protocol buffer file for language support
+ C++ bindings for the dataplane API.
+
+Package: libvyatta-controller-proto-dev
+Section: libdevel
+Architecture: any
+Depends: libvyatta-controller-proto1 (= ${binary:Version}), ${misc:Depends}
+Description: Provides C++ headers for the dataplane API.
+ C++ headers for the dataplane API.
