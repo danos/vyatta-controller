@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019, AT&T Intellectual Property. All rights reserved.
+ * Copyright (c) 2017-2020, AT&T Intellectual Property. All rights reserved.
  * Copyright (c) 2015-2017 by Brocade Communications Systems, Inc.
  * All rights reserved.
  *
@@ -80,6 +80,7 @@ typedef struct vplaneif_ {
 	uint32_t ifindex;
 	uint32_t operstate;
 	int fd;
+	void *cookie;
 	char ifname[IFNAMSIZ];
 } vplaneif_t;
 
@@ -442,6 +443,30 @@ vplane_iface_add(vplane_t *vp, uint32_t ifn, uint32_t ifindex,
 		info("vplane(%d.%u): %s interface %s (%u)", vp->id, ifn,
 		     action, vpif->ifname, vpif->ifindex);
 	return 0;
+}
+
+void *vplane_iface_get_cookie(const vplane_t *vp, uint32_t ifn)
+{
+	const vplaneif_t *vpif;
+
+	vpif = vplane_iface_get(vp, ifn, true, "iface_get_cookie");
+	if (vpif != NULL)
+		return vpif->cookie;
+
+	return NULL;
+}
+
+int vplane_iface_set_cookie(const vplane_t *vp, uint32_t ifn, void *cookie)
+{
+	vplaneif_t *vpif;
+
+	vpif = vplane_iface_get(vp, ifn, true, "iface_set_cookie");
+	if (vpif != NULL) {
+		vpif->cookie = cookie;
+		return 0;
+	}
+
+	return -1;
 }
 
 static void

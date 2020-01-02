@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, AT&T Intellectual Property. All rights reserved.
+ * Copyright (c) 2019-2020, AT&T Intellectual Property. All rights reserved.
  * Copyright (c) 2015-2016 by Brocade Communications Systems, Inc.
  * All rights reserved.
  *
@@ -84,6 +84,9 @@ void vplane_iface_del(vplane_t *vp, uint32_t ifn);
 /* Add an interface to a specific vplane instance. */
 int vplane_iface_add(vplane_t *vp, uint32_t ifn, uint32_t ifindex,
 		     const char *ifname);
+
+void *vplane_iface_get_cookie(const vplane_t *vp, uint32_t ifn);
+int vplane_iface_set_cookie(const vplane_t *vp, uint32_t ifn, void *cookie);
 
 /*
  * Using the message envelope as the session key, mark a vplane as

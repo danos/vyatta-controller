@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019, AT&T Intellectual Property. All rights reserved.
+ * Copyright (c) 2018-2020, AT&T Intellectual Property. All rights reserved.
  * Copyright (c) 2015-2017 by Brocade Communications Systems, Inc.
  * All rights reserved.
  *
@@ -337,7 +337,8 @@ static zmsg_t *test_build_connect(uint32_t sid, uint32_t version,
 }
 
 static void test_check_port_reply(zmsg_t *reply, uint32_t sid, bool ok,
-				  uint64_t seqno, uint32_t ifindex)
+				  uint64_t seqno, uint32_t ifindex,
+				  const char *ifname)
 {
 	zframe_t *fr;
 
@@ -358,43 +359,155 @@ static void test_check_port_reply(zmsg_t *reply, uint32_t sid, bool ok,
 		fr = zmsg_next(reply);
 		CHECK(zframe_size(fr) == sizeof(ifindex));
 		CHECK(memcmp(zframe_data(fr), &ifindex, sizeof(ifindex)) == 0);
+		if (ifname != NULL) {
+			fr = zmsg_next(reply);
+			CHECK(zframe_streq(fr, ifname));
+		}
 	}
 }
 
-static zmsg_t *test_build_port(int dpid, uint32_t sid, uint64_t seqno,
-			       uint32_t ifno, struct ip_addr raddr, bool add,
-			       uint32_t ifindex, char *ifname)
+static zmsg_t *test_build_msg_header(uint32_t sid, uint64_t seqno,
+				     const char *msgtype)
 {
 	zmsg_t *msg;
 
 	msg = zmsg_new();
 	CHECK(msg != NULL);
 	CHECK(zmsg_addmem(msg, &sid, sizeof(sid)) == 0);
-	if (add) {
-		char json[BUFSIZ];
-		struct ether_addr ethaddr = { 0 };
-
-		CHECK(zmsg_addstr(msg, "NEWPORT") == 0);
-		CHECK(zmsg_addmem(msg, &seqno, sizeof(seqno)) == 0);
-		CHECK(zmsg_addmem(msg, &raddr, sizeof(raddr)) == 0);
-		snprintf(json, sizeof(json),
-			 "{ \"port\":%u, \"mac\":\"%s\", \"name\":\"test%u\", "
-			 "\"driver\":\"test\", \"pci-address\":\"0000:00:01.0\" }",
-			 ifno, ether_ntoa(&ethaddr), ifno
-			 );
-		CHECK(zmsg_addstr(msg, json) == 0);
-	} else {
-		CHECK(zmsg_addstr(msg, "DELPORT") == 0);
-		CHECK(zmsg_addmem(msg, &seqno, sizeof(seqno)) == 0);
-		CHECK(zmsg_addmem(msg, &ifno, sizeof(ifno)) == 0);
-		CHECK(zmsg_addmem(msg, &ifindex, sizeof(ifindex)) == 0);
-		CHECK(zmsg_addmem(msg, &raddr, sizeof(raddr)) == 0);
-	}
-
-	if (ifname != NULL) {
-		snprintf(ifname, IFNAMSIZ, "dp%dp0s1", dpid);
-	}
+	CHECK(zmsg_addstr(msg, msgtype) == 0);
+	CHECK(zmsg_addmem(msg, &seqno, sizeof(seqno)) == 0);
 	return msg;
+}
+
+static zmsg_t *test_build_delport(uint32_t sid, uint64_t seqno,
+				  uint32_t ifno, struct ip_addr raddr,
+				  uint32_t ifindex)
+{
+	zmsg_t *msg;
+
+	msg = test_build_msg_header(sid, seqno, "DELPORT");
+	CHECK(zmsg_addmem(msg, &ifno, sizeof(ifno)) == 0);
+	CHECK(zmsg_addmem(msg, &ifindex, sizeof(ifindex)) == 0);
+	CHECK(zmsg_addmem(msg, &raddr, sizeof(raddr)) == 0);
+	return msg;
+}
+
+static zmsg_t *test_build_newport(int dpid, uint32_t sid, uint64_t seqno,
+				  uint32_t ifno, struct ip_addr raddr,
+				  char *ifname)
+{
+	struct ether_addr ethaddr = { 0 };
+	char json[BUFSIZ];
+	zmsg_t *msg;
+
+	msg = test_build_msg_header(sid, seqno, "NEWPORT");
+	CHECK(zmsg_addmem(msg, &raddr, sizeof(raddr)) == 0);
+	snprintf(json, sizeof(json),
+		 "{ \"port\":%u, \"mac\":\"%s\", \"name\":\"test%u\", "
+		 "\"driver\":\"test\", \"pci-address\":\"0000:00:01.0\" }",
+		 ifno, ether_ntoa(&ethaddr), ifno
+		);
+	CHECK(zmsg_addstr(msg, json) == 0);
+	if (ifname != NULL)
+		snprintf(ifname, IFNAMSIZ, "dp%dp0s1", dpid);
+
+	return msg;
+}
+
+static zmsg_t *test_send_iniport(vplane_t *vp, uint32_t sid, uint64_t seqno,
+				 uint32_t ifno, char *ifname)
+{
+	struct ether_addr ethaddr = { 0 };
+	char json[BUFSIZ];
+	zmsg_t *reply;
+	zmsg_t *msg;
+	int dpid = 1;
+
+	msg = test_build_msg_header(sid, seqno, "INIPORT");
+	snprintf(json, sizeof(json),
+		 "{ \"port\":%u, \"mac\":\"%s\", \"name\":\"test%u\", "
+		 "\"driver\":\"test\", \"pci-address\":\"0000:00:01.0\" }",
+		 ifno, ether_ntoa(&ethaddr), ifno
+		);
+	CHECK(zmsg_addstr(msg, json) == 0);
+	if (vp != NULL) {
+		CHECK(vplane_connect(vp, zmsg_first(msg)) == 0);
+		dpid = vplane_get_id(vp);
+	}
+	mock().expectOneCall("zmsg_send")
+		.ignoreOtherParameters()
+		.andReturnValue(0);
+	reply = test_send_request(msg);
+	zmsg_destroy(&msg);
+	snprintf(ifname, IFNAMSIZ, "dp%dp0s1", dpid);
+	return reply;
+}
+
+static zmsg_t *test_send_addport(uint32_t sid, uint64_t seqno, uint32_t ifno,
+				 const char *ifname)
+{
+	zmsg_t *reply;
+	zmsg_t *msg;
+
+	msg = test_build_msg_header(sid, seqno, "ADDPORT");
+	CHECK(zmsg_addmem(msg, &ifno, sizeof(ifno)) == 0);
+	CHECK(zmsg_addstr(msg, ifname) == 0);
+
+	mock().expectOneCall("zmsg_send")
+		.ignoreOtherParameters()
+		.andReturnValue(0);
+	reply = test_send_request(msg);
+	zmsg_destroy(&msg);
+	return reply;
+}
+
+static uint64_t test_add_port(vplane_t *vp, uint32_t sid, uint64_t seqno,
+			      uint32_t ifno, const char *devinfo,
+			      uint32_t ifindex, const char *ifname,
+			      const char *driver)
+{
+	zmsg_t *reply;
+	zmsg_t *msg;
+
+	msg = test_build_msg_header(sid, seqno, "INIPORT");
+	CHECK(zmsg_addstr(msg, devinfo) == 0);
+	CHECK(vplane_connect(vp, zmsg_first(msg)) == 0);
+
+	mock().expectOneCall("zmsg_send")
+		.ignoreOtherParameters()
+		.andReturnValue(0);
+
+	reply = test_send_request(msg);
+	zmsg_destroy(&msg);
+	test_check_port_reply(reply, sid, true, seqno, ifno, ifname);
+	zmsg_destroy(&reply);
+
+	mock().setData("ifidx", ifindex);
+	if (driver != NULL)
+		mock().expectOneCall("port_create")
+			.withParameter("ifname", ifname)
+			.withParameter("driver", driver)
+			.ignoreOtherParameters()
+			.andReturnValue(0);
+	else
+		mock().expectOneCall("port_create")
+			.withParameter("ifname", ifname)
+			.ignoreOtherParameters()
+			.andReturnValue(0);
+
+	mock().expectOneCall("zmsg_send")
+		.ignoreOtherParameters()
+		.andReturnValue(0);
+
+	seqno++;
+	msg = test_build_msg_header(sid, seqno, "ADDPORT");
+	CHECK(zmsg_addmem(msg, &ifno, sizeof(ifno)) == 0);
+	CHECK(zmsg_addstr(msg, ifname) == 0);
+	reply = test_send_request(msg);
+	zmsg_destroy(&msg);
+	test_check_port_reply(reply, sid, true, seqno, ifindex, ifname);
+	zmsg_destroy(&reply);
+	return seqno;
 }
 
 typedef struct _if_data {
@@ -436,12 +549,6 @@ TEST(request, funny_if_types)
 		vp = vplane_findbyuuid(vplanes[id].uuid);
 		CHECK(vp != NULL);
 
-		msg = zmsg_new();
-		CHECK(msg != NULL);
-		CHECK(zmsg_addmem(msg, &sessionid, sizeof(sessionid)) == 0);
-		CHECK(zmsg_addstr(msg, "NEWPORT") == 0);
-		CHECK(zmsg_addmem(msg, &seqno, sizeof(seqno)) == 0);
-		CHECK(zmsg_addmem(msg, &raddr, sizeof(raddr)) == 0);
 		snprintf(json2, sizeof(json2), 
 			 if_test_params[index].json_fmt_str, slot);
 		snprintf(json, sizeof(json),
@@ -453,32 +560,20 @@ TEST(request, funny_if_types)
 			 if_test_params[index].driver,
 			 json2
 			 );
-		CHECK(zmsg_addstr(msg, json) == 0);
-		CHECK(vplane_connect(vp, zmsg_first(msg)) == 0);
 
 		// Workout the expected ifname
 		snprintf(ifname, IFNAMSIZ, 
 			 if_test_params[index].ifname_fmt_str, 
 			 vplane_get_id(vp), slot);
 
-		mock().setData("ifidx", ifindex);
-		mock().expectOneCall("port_create")
-			.withParameter("ifname", ifname)
-			.withParameter("driver", if_test_params[index].driver)
-			.ignoreOtherParameters()
-			.andReturnValue(0);
-		mock().expectOneCall("zmsg_send")
-			.ignoreOtherParameters()
-			.andReturnValue(0);
-		reply = test_send_request(msg);
-		zmsg_destroy(&msg);
-		test_check_port_reply(reply, sessionid, true, seqno, ifindex);
-		zmsg_destroy(&reply);
+		seqno = test_add_port(vp, sessionid, seqno, ifno, json,
+				      ifindex, ifname,
+				      if_test_params[index].driver);
 
 		// Now tidy up this port so we can try another
 		seqno++;
-		msg = test_build_port(id+1, sessionid, seqno, ifno, raddr,
-				      false, ifindex, NULL);
+		msg = test_build_delport(sessionid, seqno, ifno, raddr,
+					 ifindex);
 
 		mock().expectOneCall("port_delete")
 			.withParameter("ifindex", (int)ifindex)
@@ -490,7 +585,7 @@ TEST(request, funny_if_types)
 
 		reply = test_send_request(msg);
 		zmsg_destroy(&msg);
-		test_check_port_reply(reply, sessionid, true, seqno, 0);
+		test_check_port_reply(reply, sessionid, true, seqno, 0, NULL);
 		zmsg_destroy(&reply);
 
 		ifno++;
@@ -500,7 +595,7 @@ TEST(request, funny_if_types)
         }
 }
 
-TEST(request, ports)
+TEST(request, newport)
 {
 	zmsg_t *msg;
 	int id = 0;
@@ -517,8 +612,8 @@ TEST(request, ports)
 	raddr.af = AF_INET;
 	vp = vplane_findbyuuid(vplanes[id].uuid);
 	CHECK(vp != NULL);
-	msg = test_build_port(id+1, sessionid, seqno, ifno, raddr, true,
-			      0, ifname);
+	msg = test_build_newport(id+1, sessionid, seqno, ifno, raddr,
+				 ifname);
 
 	CHECK(vplane_connect(vp, zmsg_first(msg)) == 0);
 
@@ -533,12 +628,12 @@ TEST(request, ports)
 
 	reply = test_send_request(msg);
 	zmsg_destroy(&msg);
-	test_check_port_reply(reply, sessionid, true, seqno, ifindex);
+	test_check_port_reply(reply, sessionid, true, seqno, ifindex,
+			      ifname);
 	zmsg_destroy(&reply);
 
 	seqno++;
-	msg = test_build_port(id+1, sessionid, seqno, ifno, raddr, false,
-			      ifindex, NULL);
+	msg = test_build_delport(sessionid, seqno, ifno, raddr, ifindex);
 
 	mock().expectOneCall("port_delete")
 		.withParameter("ifindex", (int)ifindex)
@@ -550,7 +645,210 @@ TEST(request, ports)
 
 	reply = test_send_request(msg);
 	zmsg_destroy(&msg);
-	test_check_port_reply(reply, sessionid, true, seqno, 0);
+	test_check_port_reply(reply, sessionid, true, seqno, 0, NULL);
+	zmsg_destroy(&reply);
+}
+
+TEST(request, addport)
+{
+	zmsg_t *msg;
+	int id = 0;
+	uint32_t sessionid = vplanes[id].sessionid;
+	uint64_t seqno = 1;
+	uint32_t ifno = 4;
+	struct ip_addr raddr;
+	char ifname[IFNAMSIZ];
+	int ifindex = 101;
+	zmsg_t *reply;
+	vplane_t *vp;
+	struct ether_addr ethaddr = { 0 };
+	char json[BUFSIZ];
+
+	/*
+	 * Really must remove the "raddr" element from various
+	 * messages (DELPORT, LINKUP & LINKDOWN) - its of no use. But
+	 * removal needs careful coordination between controller &
+	 * dataplane.
+	 */
+	raddr.ip.v4.s_addr = inet_addr(vplanes[id].ip);
+	raddr.af = AF_INET;
+	snprintf(json, sizeof(json),
+		 "{ \"port\":%u, \"mac\":\"%s\", \"name\":\"test%u\", "
+		 "\"driver\":\"test\", \"pci-address\":\"0000:00:01.0\" }",
+		 ifno, ether_ntoa(&ethaddr), ifno
+		);
+	snprintf(ifname, IFNAMSIZ, "dp%dp0s1", id+1);
+
+	vp = vplane_findbyuuid(vplanes[id].uuid);
+	CHECK(vp != NULL);
+
+	seqno = test_add_port(vp, sessionid, seqno, ifno, json,
+			      ifindex, ifname, NULL);
+
+	seqno++;
+	msg = test_build_delport(sessionid, seqno, ifno, raddr, ifindex);
+
+	mock().expectOneCall("port_delete")
+		.withParameter("ifindex", (int)ifindex)
+		.ignoreOtherParameters()
+		.andReturnValue(0);
+	mock().expectOneCall("zmsg_send")
+		.ignoreOtherParameters()
+		.andReturnValue(0);
+
+	reply = test_send_request(msg);
+	zmsg_destroy(&msg);
+	test_check_port_reply(reply, sessionid, true, seqno, 0, NULL);
+	zmsg_destroy(&reply);
+
+	/*
+	 * Establish a port but issue a DELPORT rather than the
+	 * expected ADDPORT.
+	 */
+	seqno++;
+	reply = test_send_iniport(NULL, sessionid, seqno, ifno, ifname);
+	test_check_port_reply(reply, sessionid, true, seqno, ifno, ifname);
+	zmsg_destroy(&reply);
+
+	seqno++;
+	msg = test_build_delport(sessionid, seqno, ifno, raddr, 99);
+
+	mock().expectOneCall("port_delete")
+		.withParameter("ifindex", (int)99)
+		.ignoreOtherParameters()
+		.andReturnValue(0);
+	mock().expectOneCall("zmsg_send")
+		.ignoreOtherParameters()
+		.andReturnValue(0);
+
+	reply = test_send_request(msg);
+	zmsg_destroy(&msg);
+	test_check_port_reply(reply, sessionid, true, seqno, 0, NULL);
+	zmsg_destroy(&reply);
+}
+
+TEST(request, addport_errors)
+{
+	zmsg_t *msg;
+	int id = 0;
+	uint32_t sessionid = vplanes[id].sessionid;
+	uint64_t seqno = 1;
+	uint32_t ifno = 5;
+	struct ip_addr raddr;
+	char ifname[IFNAMSIZ];
+	zmsg_t *reply;
+	vplane_t *vp;
+	char json[BUFSIZ];
+
+	raddr.ip.v4.s_addr = inet_addr(vplanes[id].ip);
+	raddr.af = AF_INET;
+	vp = vplane_findbyuuid(vplanes[id].uuid);
+	CHECK(vp != NULL);
+
+	/*
+	 * Fail the port create operation
+	 */
+	seqno++;
+	reply = test_send_iniport(vp, sessionid, seqno, ifno, ifname);
+	test_check_port_reply(reply, sessionid, true, seqno, ifno, ifname);
+	zmsg_destroy(&reply);
+
+	mock().setData("ifidx", 0);
+	mock().expectOneCall("port_create")
+		.withParameter("ifname", ifname)
+		.ignoreOtherParameters()
+		.andReturnValue(-1);
+	seqno++;
+	reply = test_send_addport(sessionid, seqno, ifno, ifname);
+	test_check_port_reply(reply, sessionid, false, seqno, 0, NULL);
+	zmsg_destroy(&reply);
+
+	/*
+	 * Issue the INIPORT message but with a junk device string.
+	 */
+	msg = test_build_msg_header(sessionid, seqno, "INIPORT");
+	snprintf(json, sizeof(json),
+		 "{ \"port\":%u, \"name\":\"test%u\", "
+		 "\"driver\":\"test\", \"pci-address\":\"0000:00:01.0\"",
+		 ifno, ifno
+		);
+	CHECK(zmsg_addstr(msg, json) == 0);
+	mock().expectNCalls(1, "logit")
+		.withParameter("level", LOG_ERR);
+	mock().expectOneCall("zmsg_send")
+		.ignoreOtherParameters()
+		.andReturnValue(0);
+	reply = test_send_request(msg);
+	zmsg_destroy(&msg);
+	test_check_port_reply(reply, sessionid, false, seqno, 0, NULL);
+	zmsg_destroy(&reply);
+
+	/*
+	 * Establish a port but issue the ADDPORT with the wrong
+	 * interface name
+	 */
+	seqno++;
+	reply = test_send_iniport(NULL, sessionid, seqno, ifno, ifname);
+	test_check_port_reply(reply, sessionid, true, seqno, ifno, ifname);
+	zmsg_destroy(&reply);
+	seqno++;
+	mock().expectNCalls(1, "logit")
+		.withParameter("level", LOG_ERR);
+	reply = test_send_addport(sessionid, seqno, ifno, "dp1p0s2");
+	test_check_port_reply(reply, sessionid, false, seqno, 0, NULL);
+	zmsg_destroy(&reply);
+
+	/*
+	 * As above, but the ADDPORT has the wrong port ID
+	 */
+	seqno++;
+	reply = test_send_iniport(NULL, sessionid, seqno, ifno, ifname);
+	test_check_port_reply(reply, sessionid, true, seqno, ifno, ifname);
+	zmsg_destroy(&reply);
+	seqno++;
+	mock().expectNCalls(2, "logit")
+		.withParameter("level", LOG_ERR);
+	reply = test_send_addport(sessionid, seqno, ifno+1, ifname);
+	test_check_port_reply(reply, sessionid, false, seqno, 0, NULL);
+	zmsg_destroy(&reply);
+
+	seqno++;
+	msg = test_build_delport(sessionid, seqno, ifno, raddr, 0);
+
+	mock().expectOneCall("port_delete")
+		.withParameter("ifindex", (int)0)
+		.ignoreOtherParameters()
+		.andReturnValue(0);
+	mock().expectOneCall("zmsg_send")
+		.ignoreOtherParameters()
+		.andReturnValue(0);
+
+	reply = test_send_request(msg);
+	zmsg_destroy(&msg);
+	test_check_port_reply(reply, sessionid, true, seqno, 0, NULL);
+	zmsg_destroy(&reply);
+
+	/*
+	 * Issue back-to-back INI port requests
+	 */
+	seqno++;
+	reply = test_send_iniport(NULL, sessionid, seqno, ifno, ifname);
+	test_check_port_reply(reply, sessionid, true, seqno, ifno, ifname);
+	zmsg_destroy(&reply);
+	seqno++;
+	reply = test_send_iniport(NULL, sessionid, seqno, ifno, ifname);
+	test_check_port_reply(reply, sessionid, true, seqno, ifno, ifname);
+	zmsg_destroy(&reply);
+
+	/*
+	 * Issue an ADDPORT without the corresponding INIPORT request
+	 */
+	seqno++;
+	ifno++;
+	mock().expectNCalls(2, "logit")
+		.withParameter("level", LOG_ERR);
+	reply = test_send_addport(sessionid, seqno, ifno, ifname);
+	test_check_port_reply(reply, sessionid, false, seqno, 0, NULL);
 	zmsg_destroy(&reply);
 }
 
@@ -659,8 +957,8 @@ TEST(request, errors)
 	 * Issue port create message, but fail the actual (tunnel)
 	 * create operation.
 	 */
-	msg = test_build_port(id+1, sessionid, seqno, ifno, raddr, true,
-			      0, ifname);
+	msg = test_build_newport(id+1, sessionid, seqno, ifno, raddr,
+				 ifname);
 
 	CHECK(vplane_connect(vp, zmsg_first(msg)) == 0);
 
@@ -675,7 +973,7 @@ TEST(request, errors)
 
 	reply = test_send_request(msg);
 	zmsg_destroy(&msg);
-	test_check_port_reply(reply, sessionid, false, seqno, 0);
+	test_check_port_reply(reply, sessionid, false, seqno, 0, NULL);
 	zmsg_destroy(&reply);
 
 	/*
@@ -887,8 +1185,8 @@ TEST(request, local)
 	 * Issue a NEWPORT and ensure that the vplane is marked as
 	 * connected. That is, simulate request/vplane processing on VR.
 	 */
-	msg = test_build_port(0, 2, seqno, ifno, raddr, true,
-			      0, ifname);
+	msg = test_build_newport(0, 2, seqno, ifno, raddr,
+				 ifname);
 
 	CHECK(vplane_connect(vp, zmsg_first(msg)) == 0);
 
@@ -903,7 +1201,7 @@ TEST(request, local)
 
 	reply = test_send_request(msg);
 	zmsg_destroy(&msg);
-	test_check_port_reply(reply, 2, true, seqno, ifindex);
+	test_check_port_reply(reply, 2, true, seqno, ifindex, ifname);
 	zmsg_destroy(&reply);
 	CHECK(vplane_is_connected(vp));
 }

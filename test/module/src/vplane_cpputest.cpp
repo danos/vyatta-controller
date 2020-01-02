@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017,2019, AT&T Intellectual Property. All rights reserved.
+ * Copyright (c) 2017-2020, AT&T Intellectual Property. All rights reserved.
  * Copyright (c) 2015-2017 by Brocade Communications Systems, Inc.
  * All rights reserved.
  *
@@ -373,6 +373,16 @@ TEST(vplane, interface)
 		.withParameter("level", LOG_ERR);
 	CHECK(vplane_iface_add(vp, 256, 1001, "s1") < 0);
 	CHECK(vplane_iface_get_ifindex(vp, 256) == 0);
+
+	const char *ifname;
+	CHECK(vplane_iface_add(vp, 3, 0, "cookie1") == 0);
+	CHECK(vplane_iface_get_ifindex(vp, 3) == 0);
+	ifname = vplane_iface_get_ifname(vp, 3);
+	CHECK(vplane_iface_set_cookie(vp, 3, (void *)ifname) == 0);
+	CHECK(vplane_iface_get_cookie(vp, 3) == ifname);
+	CHECK(vplane_iface_add(vp, 3, 1003, ifname) == 0);
+	CHECK(streq("cookie1", vplane_iface_get_ifname(vp, 3)));
+	CHECK(vplane_iface_get_ifindex(vp, 3) == 1003);
 }
 
 TEST(vplane, address)

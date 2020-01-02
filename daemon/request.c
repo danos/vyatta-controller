@@ -1,8 +1,7 @@
 /*
  * Request socket handling thread.
  *
- * Copyright (c) 2018-2019, AT&T Intellectual Property. All rights reserved.
- * Copyright (c) 2018, 2019, AT&T Intellectual Property.  All rights reserved.
+ * Copyright (c) 2018-2020, AT&T Intellectual Property. All rights reserved.
  * Copyright (c) 2012-2017 by Brocade Communications Systems, Inc.
  * All rights reserved.
  *
@@ -654,10 +653,10 @@ static int conf_request(request_t *req, zmsg_t *req_msg __unused)
 /*
  * Parse port creation message:
  *   [1] <seqno> 64bit
- *   [2] <myip> 32bits - network byte order
+ *   [2] <myip> 32bits - network byte order (ignored)
  *   [3] <info> string - JSON encoded slot related info
  */
-static int addport_request(request_t *req, zmsg_t *msg)
+static int newport_request(request_t *req, zmsg_t *msg)
 {
 	char ifname[IFNAMSIZ];
 	struct ether_addr eth;
@@ -714,7 +713,7 @@ static int addport_request(request_t *req, zmsg_t *msg)
 	return 0;
 
   err:
-	reply_error(req, "FAIL: addport_request");
+	reply_error(req, "FAIL: newport_request");
 	return rc;
 }
 
@@ -723,7 +722,7 @@ static int addport_request(request_t *req, zmsg_t *msg)
  *   [1] <seqno>  64bit
  *   [2] <port> 32bit
  *   [3] <ifindex>  32bit
- *   [4] <myip> ipv4/ipv6 address
+ *   [4] <myip> ipv4/ipv6 address (ignored)
  */
 static int delport_request(request_t *req, zmsg_t *msg)
 {
@@ -757,6 +756,184 @@ static int delport_request(request_t *req, zmsg_t *msg)
 	vplane_iface_del(req->vp, req->portno);
 	send_ifindex(req, rc, seqno);
 	return 0;
+}
+
+struct dpport_cookie {
+	struct ether_addr eth;
+	char *driver;
+	char *bus;
+	unsigned int if_flags;
+	unsigned int mtu;
+};
+
+static void dpport_cookie_destroy(struct dpport_cookie **cookiep)
+{
+	struct dpport_cookie *cookie = *cookiep;
+
+	if (cookie != NULL) {
+		free(cookie->driver);
+		free(cookie->bus);
+		free(cookie);
+	}
+
+	*cookiep = NULL;
+}
+
+static struct dpport_cookie *dpport_cookie_create(void)
+{
+	return calloc(1, sizeof(struct dpport_cookie));
+}
+
+/*
+ * Parse port initialisation message:
+ *   [1] <seqno>  64bit
+ *   [2] <devinfo> string - JSON string with details of the device
+ *
+ * Response
+ *   [1] <seqno>  64bit
+ *   [2] <cookie> 32bit  - context to be supplied in ADDPORT
+ *   [3] <ifname> string - generated interface name
+ */
+static int iniport_request(request_t *req, zmsg_t *msg)
+{
+	struct dpport_cookie *cookie = NULL;
+	char ifname[IFNAMSIZ];
+	char *devinfo;
+	uint64_t seqno;
+	int rc;
+
+	if (zmsg_popu64(msg, &seqno) < 0) {
+		reply_error(req, "seqno");
+		return -1;
+	}
+
+	devinfo = zmsg_popstr(msg);
+	if (devinfo == NULL) {
+		reply_error(req, "info");
+		return -1;
+	}
+
+	cookie = dpport_cookie_create();
+	if (cookie == NULL) {
+		reply_error(req, "cookie");
+		return -1;
+	}
+
+	/*
+	 * Parse the physical device details
+	 */
+	rc = assign_port(devinfo, vplane_get_id(req->vp), ifname,
+			 &cookie->eth, &cookie->driver, &cookie->bus,
+			 &cookie->if_flags, &cookie->mtu);
+	free(devinfo);
+
+	if (rc < 0)
+		goto err;
+
+	/*
+	 * Establish an interface "placeholder" and save the device
+	 * details until we get the corresponding ADDPORT message.
+	 */
+	req->portno = rc;
+	rc = vplane_iface_add(req->vp, req->portno, 0, ifname);
+	if (rc < 0)
+		goto err;
+
+	rc = vplane_iface_set_cookie(req->vp, req->portno, cookie);
+	if (rc < 0) {
+		vplane_iface_del(req->vp, req->portno);
+		goto err;
+	}
+
+	send_port_response(req, req->portno, ifname, seqno);
+	return 0;
+
+err:
+	dpport_cookie_destroy(&cookie);
+	reply_error(req, "FAIL: iniport_request");
+	return rc;
+}
+
+/*
+ * Parse port add message:
+ *   [1] <seqno>  64bit
+ *   [2] <cookie> 32bit  - context, as provided by INI response
+ *   [3] <ifname> string - Interface name, as provided by INI response
+ *
+ * Response
+ *   [1] <seqno>  64bit
+ *   [2] <ifindex> 32bit - Interface ifindex
+ *   [3] <ifname> string - Interface name
+ */
+static int addport_request(request_t *req, zmsg_t *msg)
+{
+	struct dpport_cookie *cookie = NULL;
+	const char *ifname;
+	char *dpifname;
+	uint64_t seqno;
+	uint32_t portno;
+	int rc = -1;
+
+	if (zmsg_popu64(msg, &seqno) < 0) {
+		reply_error(req, "seqno");
+		return -1;
+	}
+
+	if (zmsg_popu32(msg, &portno) < 0) {
+		reply_error(req, "cookie");
+		return -1;
+	}
+	req->portno = portno;
+
+	dpifname = zmsg_popstr(msg);
+	if (dpifname == NULL) {
+		reply_error(req, "ifname");
+		return -1;
+	}
+
+	ifname = vplane_iface_get_ifname(req->vp, req->portno);
+	if ((ifname == NULL) ||
+	    !streq(ifname, dpifname)) {
+		err("mismatched or missing ifnames %s %s",
+		    ifname == NULL ? "N/A" : ifname,
+		    dpifname);
+		goto err;
+	}
+
+	free(dpifname);
+	dpifname = NULL;
+	cookie = vplane_iface_get_cookie(req->vp, req->portno);
+	if (cookie == NULL) {
+		err("missing port cookie");
+		goto err;
+	}
+	vplane_iface_set_cookie(req->vp, req->portno, NULL);
+
+	/*
+	 * Now generate the shadow port and get hold of the resultant ifindex
+	 */
+	uint32_t ifindex;
+	rc = port_create(req->vp, req->portno, ifname,
+			 &cookie->eth, cookie->driver, cookie->bus,
+			 cookie->if_flags, cookie->mtu, &ifindex);
+	dpport_cookie_destroy(&cookie);
+
+	if (rc < 0)
+		goto err;
+
+	rc = vplane_iface_add(req->vp, req->portno, ifindex, ifname);
+	if (rc < 0)
+		goto err;
+
+	send_port_response(req, ifindex, ifname, seqno);
+	return 0;
+
+err:
+	free(dpifname);
+	dpport_cookie_destroy(&cookie);
+	vplane_iface_del(req->vp, req->portno);
+	reply_error(req, "FAIL: addport_request");
+	return rc;
 }
 
 static int get_duplex(zmsg_t *msg, unsigned *duplex)
@@ -1180,7 +1357,9 @@ typedef struct request_handler_ {
 static const request_handler_t request_handlers[] = {
 	{.name = "CONNECT", .hdlr = connect_request, .noconnectcheck = true},
 	{.name = "CONFQUERY", .hdlr = conf_request},
-	{.name = "NEWPORT", .hdlr = addport_request},
+	{.name = "INIPORT", .hdlr = iniport_request},
+	{.name = "ADDPORT", .hdlr = addport_request},
+	{.name = "NEWPORT", .hdlr = newport_request},
 	{.name = "DELPORT", .hdlr = delport_request},
 	{.name = "WHATSUP?", .hdlr = snapshot_request},
 	{.name = "LINKUP", .hdlr = linkup_request},
