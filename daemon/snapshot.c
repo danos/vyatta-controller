@@ -2,7 +2,7 @@
  * Track netlink messages, maintaining current state
  * of interfaces, addresses and routes
  *
- * Copyright (c) 2017-2019 AT&T Intellectual Property.  All rights reserved.
+ * Copyright (c) 2017-2020 AT&T Intellectual Property.  All rights reserved.
  * Copyright (c) 2012-2017 by Brocade Communications Systems, Inc.
  * All rights reserved.
  *
@@ -944,6 +944,14 @@ static void snapshot_handle_non_xfrm_msg(snapshot_t *self, nlmsg_t *nmsg)
 			if (is_team_master(nlh))
 				delete_dependent_team_entries(self, key);
 			zhash_delete(self->link, key);
+			/*
+			 * The interface may have previously been a
+			 * slave, but there may have been no
+			 * intermediate update that removed the master
+			 * from the device so also check the
+			 * slave_link table.
+			 */
+			zhash_delete(self->slave_link, key);
 		}
 
 		nlmsg_free(nmsg);
