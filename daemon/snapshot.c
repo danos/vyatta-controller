@@ -56,7 +56,8 @@ struct _snapshot {
 	zhash_t *xfrm;
 	zhash_t *l2tp_tunnel;
 	zhash_t *l2tp_session;
-	zhash_t *slave_link;
+	zhash_t *bridge_slave_link;
+	zhash_t *team_slave_link;
 	zhash_t *team_select;
 	zhash_t *team_mode;
 	zhash_t *team_recipe;
@@ -91,7 +92,8 @@ void snapshot_destroy(snapshot_t **selfp)
 		zhash_destroy(&self->xfrm);
 		zhash_destroy(&self->l2tp_tunnel);
 		zhash_destroy(&self->l2tp_session);
-		zhash_destroy(&self->slave_link);
+		zhash_destroy(&self->bridge_slave_link);
+		zhash_destroy(&self->team_slave_link);
 		zhash_destroy(&self->team_select);
 		zhash_destroy(&self->team_mode);
 		zhash_destroy(&self->team_recipe);
@@ -125,7 +127,8 @@ snapshot_t *snapshot_new(void)
 		self->xfrm = zhash_new();
 		self->l2tp_tunnel = zhash_new();
 		self->l2tp_session = zhash_new();
-		self->slave_link = zhash_new();
+		self->bridge_slave_link = zhash_new();
+		self->team_slave_link = zhash_new();
 		self->team_select = zhash_new();
 		self->team_mode = zhash_new();
 		self->team_recipe = zhash_new();
@@ -139,10 +142,11 @@ snapshot_t *snapshot_new(void)
 		if (!self->link || !self->vlan || !self->bridge_link ||
 		    !self->address || !self->route || !self->neighbour ||
 		    !self->netconf || !self->xfrm || !self->l2tp_tunnel ||
-		    !self->l2tp_session || !self->slave_link ||
-		    !self->team_select || !self->team_mode ||
-		    !self->team_recipe || !self->team_port ||
-		    !self->team_activeport || !self->vrf_master ||
+		    !self->l2tp_session || !self->bridge_slave_link ||
+		    !self->team_slave_link || !self->team_select ||
+		    !self->team_mode || !self->team_recipe ||
+		    !self->team_port || !self->team_activeport ||
+		    !self->vrf_master ||
 #ifdef RTNLGRP_RTDMN
 		    !self->vrf ||
 #endif
@@ -217,10 +221,12 @@ static int is_vrf_master(const struct nlmsghdr *nlh)
 	return 0;
 }
 
-static int is_slave(const struct nlmsghdr *nlh)
+static int is_slave(const struct nlmsghdr *nlh, const char *kind,
+		    size_t kind_len)
 {
 	struct nlattr *tb[IFLA_MAX+1] = { NULL };
 	struct nlattr *linkinfo[IFLA_INFO_MAX+1] = { NULL };
+	const char *slave_kind;
 	int ret;
 
 	ret = mnl_attr_parse(nlh, sizeof(struct ifinfomsg), link_attr, tb);
@@ -235,15 +241,25 @@ static int is_slave(const struct nlmsghdr *nlh)
 					  linkinfo_attr, linkinfo) != MNL_CB_OK)
 			return 0;
 
-		if (linkinfo[IFLA_INFO_SLAVE_KIND])
-			if (!strncmp(mnl_attr_get_str(
-				linkinfo[IFLA_INFO_SLAVE_KIND]), "team", 4) ||
-			    !strncmp(mnl_attr_get_str(
-				linkinfo[IFLA_INFO_SLAVE_KIND]), "bridge", 6))
+		if (linkinfo[IFLA_INFO_SLAVE_KIND]) {
+			slave_kind = mnl_attr_get_str(
+				linkinfo[IFLA_INFO_SLAVE_KIND]);
+			if (!strncmp(slave_kind, kind, kind_len))
 				return 1;
+		}
 	}
 
 	return 0;
+}
+
+static int is_bridge_slave(const struct nlmsghdr *nlh)
+{
+	return is_slave(nlh, "bridge", 6);
+}
+
+static int is_team_slave(const struct nlmsghdr *nlh)
+{
+	return is_slave(nlh, "team", 4);
 }
 
 static int is_team_master(const struct nlmsghdr *nlh)
@@ -919,15 +935,21 @@ static void snapshot_handle_non_xfrm_msg(snapshot_t *self, nlmsg_t *nmsg)
 			/* these are all AF_BRIDGE - see link_topic() */
 			zhash_update(self->bridge_link, key, nmsg);
 			zhash_freefn(self->bridge_link, key, free_nmsg);
-		} else if (is_slave(nlh)) {
-			update_with_newlink(self->slave_link, key, nmsg);
+		} else if (is_bridge_slave(nlh)) {
+			update_with_newlink(self->bridge_slave_link, key, nmsg);
+			zhash_delete(self->team_slave_link, key);
+			zhash_delete(self->link, key);
+		} else if (is_team_slave(nlh)) {
+			update_with_newlink(self->team_slave_link, key, nmsg);
+			zhash_delete(self->bridge_slave_link, key);
 			zhash_delete(self->link, key);
 		} else if (is_vrf_master(nlh)) {
 			update_with_newlink(self->vrf_master, key, nmsg);
 			zhash_delete(self->link, key);
 		} else {
 			update_with_newlink(self->link, key, nmsg);
-			zhash_delete(self->slave_link, key);
+			zhash_delete(self->bridge_slave_link, key);
+			zhash_delete(self->team_slave_link, key);
 		}
 		break;
 
@@ -936,8 +958,10 @@ static void snapshot_handle_non_xfrm_msg(snapshot_t *self, nlmsg_t *nmsg)
 			zhash_delete(self->vlan, key);
 		else if (is_bridge_link(key))
 			zhash_delete(self->bridge_link, key);
-		else if (is_slave(nlh))
-			zhash_delete(self->slave_link, key);
+		else if (is_bridge_slave(nlh))
+			zhash_delete(self->bridge_slave_link, key);
+		else if (is_team_slave(nlh))
+			zhash_delete(self->team_slave_link, key);
 		else if (is_vrf_master(nlh))
 			zhash_delete(self->vrf_master, key);
 		else {
@@ -946,12 +970,13 @@ static void snapshot_handle_non_xfrm_msg(snapshot_t *self, nlmsg_t *nmsg)
 			zhash_delete(self->link, key);
 			/*
 			 * The interface may have previously been a
-			 * slave, but there may have been no
+			 * team/bridge slave, but there may have been no
 			 * intermediate update that removed the master
 			 * from the device so also check the
-			 * slave_link table.
+			 * slave_link tables.
 			 */
-			zhash_delete(self->slave_link, key);
+			zhash_delete(self->bridge_slave_link, key);
+			zhash_delete(self->team_slave_link, key);
 		}
 
 		nlmsg_free(nmsg);
@@ -1227,7 +1252,8 @@ void snapshot_send(snapshot_t *self, void *socket, zframe_t *to)
 	snapshot_iterator(self->team_mode, send_nmsg, &target, false);
 	snapshot_iterator(self->team_recipe, send_nmsg, &target, false);
 	snapshot_iterator(self->team_port, send_nmsg, &target, false);
-	snapshot_iterator(self->slave_link, send_nmsg, &target, true);
+	snapshot_iterator(self->bridge_slave_link, send_nmsg, &target, true);
+	snapshot_iterator(self->team_slave_link, send_nmsg, &target, true);
 	snapshot_iterator(self->vlan, send_nmsg, &target, true);
 	snapshot_iterator(self->bridge_link, send_nmsg, &target, false);
 	snapshot_iterator(self->address, send_nmsg, &target, false);
