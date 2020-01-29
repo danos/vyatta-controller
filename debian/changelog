@@ -1,3 +1,17 @@
+vplane-controller (3.6.1) unstable; urgency=medium
+
+  [ John Southworth ]
+  * Add Go programming language bindings for the controller protobufs
+  * Add C++ language bindings for controller protobufs
+
+  [ Robert Shearman ]
+  * daemon: ensure newlink for bridge member is removed from snapshot on delete
+    (Fixes: VRVDR-49601)
+  * snapshot: add separate levels for team and bridge slaves
+    (Fixes: VRVDR-49763)
+
+ -- Mark Gillott <mgillott@vyatta.att-mail.com>  Wed, 29 Jan 2020 11:18:59 +0000
+
 vplane-controller (3.5.16) unstable; urgency=medium
 
   * DANOS Import master
