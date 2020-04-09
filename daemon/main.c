@@ -61,9 +61,6 @@ static const char *logfile;
 static const char *cfgfile = "/etc/vyatta/controller.conf";
 static const char *interface_cfg = "/etc/vyatta/interface.conf";
 static const char version[] = "vPlane Controller version 1.0";
-static const char copyright[]
-	 = "Copyright (c) 2017-2019, AT&T Intellectual Property.  All rights reserved.\n"
-	   "Copyright (c) 2012-2017 by Brocade Communications Systems, Inc.";
 static uid_t uid;
 static gid_t gid;
 static bool daemonmode;
@@ -960,7 +957,7 @@ static void parse_args(int argc, char **argv)
 			break;
 		}
 		case 'V':
-			printf("%s\n%s\n", version, copyright);
+			printf("%s\n", version);
 			exit(0);
 
 		default:
@@ -1556,7 +1553,6 @@ int main(int argc, char **argv)
 		open_logfile(logfile);
 	}
 
-	info("%s", copyright);
 	info("%s", version);
 
 	if (parse_cfg_file() < 0)
