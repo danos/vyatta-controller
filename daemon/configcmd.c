@@ -175,7 +175,7 @@ static void walk_db(struct lh_table *db, zlist_t **coll)
 			if (*coll == NULL)
 				*coll = zlist_new();
 
-			zlist_push(*coll, (void *)cmd);
+			zlist_append(*coll, (void *)cmd);
 		}
 		walk_db(config_node->_hash, coll);
 	}
@@ -183,6 +183,9 @@ static void walk_db(struct lh_table *db, zlist_t **coll)
 
 static int resync_comp(void *item1, void *item2)
 {
+	if (((command_node_t *) item1)->_node->_seq == -1ULL)
+		return -1;
+
 	return ((command_node_t *) item1)->_node->_seq >
 		((command_node_t *) item2)->_node->_seq;
 }
