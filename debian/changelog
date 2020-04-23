@@ -1,3 +1,9 @@
+vplane-controller (3.6.3) unstable; urgency=medium
+
+  * Don't sort cstore items that are bound to an interface (Fixes: VRVDR-50606)
+
+ -- Mark Gillott <mgillott@vyatta.att-mail.com>  Thu, 23 Apr 2020 09:56:00 +0100
+
 vplane-controller (3.6.2) unstable; urgency=medium
 
   [ Nicholas Brown ]
