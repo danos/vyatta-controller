@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019, AT&T Intellectual Property. All rights reserved.
+ * Copyright (c) 2018-2020, AT&T Intellectual Property. All rights reserved.
  * Copyright (c) 2016-2017 by Brocade Communications Systems, Inc.
  * All rights reserved.
  *
@@ -64,6 +64,10 @@ void fsnotify_add_redirects_watchers(void)
 	CPPUTEST_STUB_RET;
 }
 
+void nl_propagate_nlmsg(nlmsg_t *nmsg)
+{
+	CPPUTEST_STUB_RET;
+}
 }
 
 struct s_prefix {
@@ -420,6 +424,7 @@ TEST(snapshot, route_create_delete)
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 	struct nlmsghdr *nlh;
 	zlist_t *zmsgs = zlist_new();
+	uint32_t ifidx;
 
 	snap = snapshot_new();
 	CHECK(snap != NULL);
@@ -431,7 +436,7 @@ TEST(snapshot, route_create_delete)
 	nlh = route_netlink(&r1, RTM_NEWROUTE, false, buf, sizeof(buf));
 
 	CHECK(nlh != NULL);
-	CHECK(nl_generate_topic(nlh, topic, sizeof(topic)) >= 0);
+	CHECK(nl_generate_topic(nlh, topic, sizeof(topic), &ifidx) >= 0);
 	CHECK(snap_update(snap, topic, nlh) == 0);
 
 	CHECK(snap_collect(snap, zmsgs) == 1);
@@ -444,7 +449,7 @@ TEST(snapshot, route_create_delete)
 	route_nexthop(&r1, "192.168.2.1", 10);
 	nlh = route_netlink(&r1, RTM_NEWROUTE, true, buf, sizeof(buf));
 	CHECK(nlh != NULL);
-	CHECK(nl_generate_topic(nlh, topic, sizeof(topic)) >= 0);
+	CHECK(nl_generate_topic(nlh, topic, sizeof(topic), &ifidx) >= 0);
 	CHECK(snap_update(snap, topic, nlh) == 0);
 
 	CHECK(snap_collect(snap, zmsgs) == 1);
@@ -453,7 +458,7 @@ TEST(snapshot, route_create_delete)
 
 	nlh = route_netlink(&r1, RTM_DELROUTE, false, buf, sizeof(buf));
 	CHECK(nlh != NULL);
-	CHECK(nl_generate_topic(nlh, topic, sizeof(topic)) >= 0);
+	CHECK(nl_generate_topic(nlh, topic, sizeof(topic), &ifidx) >= 0);
 
 	CHECK(snap_update(snap, topic, nlh) == 0);
 
@@ -473,6 +478,7 @@ TEST(snapshot, ifindex)
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 	struct nlmsghdr *nlh;
 	zlist_t *zmsgs = zlist_new();
+	uint32_t ifidx;
 
 	snap = snapshot_new();
 	CHECK(snap != NULL);
@@ -483,7 +489,7 @@ TEST(snapshot, ifindex)
 	route_nexthop(&r1, "192.168.1.1", 10);
 	nlh = route_netlink(&r1, RTM_NEWROUTE, false, buf, sizeof(buf));
 	CHECK(nlh != NULL);
-	CHECK(nl_generate_topic(nlh, topic1, sizeof(topic1)) >= 0);
+	CHECK(nl_generate_topic(nlh, topic1, sizeof(topic1), &ifidx) >= 0);
 	CHECK(snap_update(snap, topic1, nlh) == 0);
 
 	route_init(&r1);
@@ -491,7 +497,7 @@ TEST(snapshot, ifindex)
 	route_nexthop(&r1, "192.168.2.1", 11);
 	nlh = route_netlink(&r1, RTM_NEWROUTE, false, buf, sizeof(buf));
 	CHECK(nlh != NULL);
-	CHECK(nl_generate_topic(nlh, topic2, sizeof(topic2)) >= 0);
+	CHECK(nl_generate_topic(nlh, topic2, sizeof(topic2), &ifidx) >= 0);
 	CHECK(snap_update(snap, topic2, nlh) == 0);
 
 	/*

@@ -1,12 +1,20 @@
 /*
  * Controller parameters
+ *
+ * Copyright (c) 2017-2020 AT&T Intellectual Property.  All rights reserved.
+ * Copyright (c) 2012-2017 by Brocade Communications Systems, Inc.
+ * All rights reserved.
+ *
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 #ifdef RTNLGRP_RTDMN
 #include <linux/rtg_domains.h>
 #endif
+#include <linux/netlink.h>
 #include "ip_addr.h"
 #include "vplane.h"
+#include "nlmsg.h"
 
 /* Used to silence Gcc where necessary */
 #define __unused	__attribute__((unused))
@@ -92,23 +100,10 @@ bool tun_admin_is_up(tun_t *self, unsigned int ifindex);
 void tun_admin_toggle(tun_t *self, unsigned int ifindex);
 
 const char *nl_route_type(unsigned int type);
-struct nlmsghdr;
-int nl_generate_topic(const struct nlmsghdr *nlm, char *buf, size_t len);
+int nl_generate_topic(const struct nlmsghdr *nlm, char *buf, size_t len,
+		      uint32_t *ifindex);
 
-/* Netlink message store */
-typedef struct _nlmsg nlmsg_t;
-int seqno_sendm(zsock_t *socket, uint64_t seqno);
-nlmsg_t *nlmsg_new(const char *str, uint64_t seqno,
-			  const void *data, size_t len);
-void nlmsg_free(nlmsg_t *nlmsg);
-nlmsg_t *nlmsg_recv(const char *topic, zmsg_t *msg);
-int nlmsg_send(nlmsg_t *nlmsg, zsock_t *socket);
-void nlmsg_dump(const char *prefix, const nlmsg_t *nlmsg);
-nlmsg_t *nlmsg_copy(nlmsg_t *nlmsg);
-const char *nlmsg_key(const nlmsg_t *nlmsg);
-uint64_t nlmsg_seqno(const nlmsg_t *nlmsg);
-const void *nlmsg_data(const nlmsg_t *nlmsg);
-
+void nl_propagate_nlmsg(nlmsg_t *nmsg);
 const char *nlmsg_type_name_rtnl(const struct nlmsghdr *nlm);
 
 typedef struct _snapshot snapshot_t;

@@ -1,7 +1,7 @@
 /*
  * Dataplane controller daemon
  *
- * Copyright (c) 2017-2019 AT&T Intellectual Property.  All rights reserved.
+ * Copyright (c) 2017-2020 AT&T Intellectual Property.  All rights reserved.
  * Copyright (c) 2012-2017 by Brocade Communications Systems, Inc.
  * All rights reserved.
  *
@@ -177,6 +177,27 @@ static void nlmsg_log(const nlmsg_t *nmsg, enum propagate_option option,
 	nlmsg_dump(prefix, nmsg);
 }
 
+static void __nl_propagate(nlmsg_t *nmsg, enum propagate_option option,
+			   const char *nmsgtype)
+{
+	if (debug)
+		nlmsg_log(nmsg, option, nmsgtype);
+
+	if (PROPAGATE_SNAPSHOT == option || PROPAGATE_BOTH == option)
+		/* send copy to snapshot service */
+		nlmsg_send(nlmsg_copy(nmsg), request_ipc);
+
+	if (PROPAGATE_PUBLISH == option || PROPAGATE_BOTH == option)
+		/* and publish original */
+		nlmsg_send(nmsg, publisher);
+}
+
+void nl_propagate_nlmsg(nlmsg_t *nmsg)
+{
+	__nl_propagate(nmsg, PROPAGATE_BOTH,
+		       nlmsg_type_name_rtnl(nlmsg_data(nmsg)));
+}
+
 /* Send topic and netlink message to snapshot service and publish */
 static void nl_propagate(const char *topic, const struct nlmsghdr *nlh,
 			 const enum propagate_option option,
@@ -188,16 +209,7 @@ static void nl_propagate(const char *topic, const struct nlmsghdr *nlh,
 	if (!nmsg)
 		panic("can't allocate memory for msg");
 
-	if (debug)
-		nlmsg_log(nmsg, option, nmsgtype);
-
-	if (PROPAGATE_SNAPSHOT == option || PROPAGATE_BOTH == option)
-		/* send copy to snapshot service */
-		nlmsg_send(nlmsg_copy(nmsg), request_ipc);
-
-	if (PROPAGATE_PUBLISH == option || PROPAGATE_BOTH == option)
-		/* and publish original */
-		nlmsg_send(nmsg, publisher);
+	__nl_propagate(nmsg, option, nmsgtype);
 }
 
 static void monitor_netlink(const struct nlmsghdr *nlh)
@@ -227,8 +239,9 @@ static int process_netlink_rtnl(const struct nlmsghdr *nlh, void *arg)
 	char topic[1024];
 	char *ifname = NULL;
 	bool publish_intf_cmds = false;
+	uint32_t ifindex = 0;
 
-	if (nl_generate_topic(nlh, topic, sizeof(topic)) < 0)
+	if (nl_generate_topic(nlh, topic, sizeof(topic), &ifindex) < 0)
 		return MNL_CB_OK;	/* unknown type */
 
 	/* Remember new interface to do netconf poll. */
@@ -251,8 +264,38 @@ static int process_netlink_rtnl(const struct nlmsghdr *nlh, void *arg)
 		}
 	}
 
-	nl_propagate(topic, nlh, PROPAGATE_BOTH,
-		     nlmsg_type_name_rtnl(nlh));
+	bool propagate = true;
+	bool propagate_pending = false;
+
+	if (ifindex != 0)
+		switch (nlh->nlmsg_type) {
+		case RTM_NEWLINK:
+			propagate_pending = nlmsg_ifindex_add(ifindex, ifname);
+			break;
+		case RTM_DELLINK:
+			nlmsg_ifindex_del(ifindex);
+			break;
+		default:
+			if (!nlmsg_ifindex_lookup(ifindex))
+				propagate = false;
+			break;
+		}
+
+	/*
+	 * If we've just acquired a new interface, publish any pending
+	 * messages (NEWNETCONF & NEWADDR arrive before the associated
+	 * NEWLINK). Alternatively if we have no knowledge of the
+	 * associated interface, save the message for later.
+	 */
+	if (!propagate)
+		nlmsg_pending_add(topic, nlh, ifindex);
+	else {
+		nl_propagate(topic, nlh, PROPAGATE_BOTH,
+			     nlmsg_type_name_rtnl(nlh));
+
+		if (propagate_pending)
+			nlmsg_pending_propagate(ifindex, &msg_seqno);
+	}
 
 	monitor_netlink(nlh);
 
@@ -1539,6 +1582,7 @@ int main(int argc, char **argv)
 
 	vplane_setup();
 	igmp_setup();
+	nlmsg_setup();
 
 	/* become daemon */
 	if (daemonmode && daemon(0, 0) < 0)
@@ -1800,6 +1844,7 @@ int main(int argc, char **argv)
 	parser_controller_cfg_destroy();
 	config_coll_destroy();
 	vplane_teardown();
+	nlmsg_cleanup();
 
 	info("controller exiting");
 	return 0;

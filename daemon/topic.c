@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019, AT&T Intellectual Property.  All rights reserved.
+ * Copyright (c) 2017-2020, AT&T Intellectual Property.  All rights reserved.
  *
  * SPDX-License-Identifier: LGPL-2.1-only
  * Copyright (c) 2014-2017 by Brocade Communications Systems, Inc.
@@ -47,7 +47,8 @@ static const char anyaddr[16];
  *  zsockopt_set_subscribe(subscriber, filter);
  * and should match "link 5 " and not "link 50 "
  */
-static int link_topic(const struct nlmsghdr *nlh, char *buf, size_t len)
+static int link_topic(const struct nlmsghdr *nlh, char *buf, size_t len,
+		      uint32_t *ifindex)
 {
 	const struct ifinfomsg *ifi = mnl_nlmsg_get_payload(nlh);
 	struct nlattr *tb[IFLA_MAX + 1] = { NULL };
@@ -71,6 +72,8 @@ static int link_topic(const struct nlmsghdr *nlh, char *buf, size_t len)
 		}
 		return snprintf(buf, len, "bridge_link %u ", ifi->ifi_index);
 	}
+
+	*ifindex = ifi->ifi_index;
 
 	const char *ifname = mnl_attr_get_str(tb[IFLA_IFNAME]);
 
@@ -132,7 +135,8 @@ static int addr_attr(const struct nlattr *attr, void *data)
  * Format up a topic string in format similar to 'ip address'
  * to describe address.
  */
-static int address_topic(const struct nlmsghdr *nlh, char *buf, size_t len)
+static int address_topic(const struct nlmsghdr *nlh, char *buf, size_t len,
+			 uint32_t *ifindex)
 {
 	const struct ifaddrmsg *ifa = mnl_nlmsg_get_payload(nlh);
 	struct nlattr *tb[IFA_MAX + 1] = { NULL };
@@ -168,6 +172,8 @@ static int address_topic(const struct nlmsghdr *nlh, char *buf, size_t len)
 		snprintf(addrstr, sizeof(addrstr), "inet %s/%d",
 			 inet_ntop(ifa->ifa_family, addr, b1, sizeof(b1)),
 			 ifa->ifa_prefixlen);
+
+	*ifindex = ifa->ifa_index;
 
 	return snprintf(buf, len,
 			"address %u %s scope %s",
@@ -405,7 +411,8 @@ static int neigh_attr(const struct nlattr *attr, void *data)
 	return MNL_CB_OK;
 }
 
-static int neigh_topic(const struct nlmsghdr *nlh, char *buf, size_t len)
+static int neigh_topic(const struct nlmsghdr *nlh, char *buf, size_t len,
+		       uint32_t *ifindex)
 {
 	const struct ndmsg *ndm = mnl_nlmsg_get_payload(nlh);
 	struct nlattr *tb[NDA_MAX + 1] = { NULL };
@@ -439,6 +446,7 @@ static int neigh_topic(const struct nlmsghdr *nlh, char *buf, size_t len)
 		addr = inet_ntop(ndm->ndm_family, dst, b1, sizeof(b1));
 	}
 
+	*ifindex = ndm->ndm_ifindex;
 	return snprintf(buf, len,
 			"neigh %d %s",
 			ndm->ndm_ifindex, addr);
@@ -457,7 +465,8 @@ static int netconf_attr(const struct nlattr *attr, void *data)
 	return MNL_CB_OK;
 }
 
-static int netconf_topic(const struct nlmsghdr *nlh, char *buf, size_t len)
+static int netconf_topic(const struct nlmsghdr *nlh, char *buf, size_t len,
+			 uint32_t *ifindexp)
 {
 	const struct netconfmsg *ncm = mnl_nlmsg_get_payload(nlh);
 	struct nlattr *tb[NETCONFA_MAX + 1] = { NULL };
@@ -501,6 +510,7 @@ static int netconf_topic(const struct nlmsghdr *nlh, char *buf, size_t len)
 		}
 	}
 
+	*ifindexp = ifindex;
 	return snprintf(buf, len, "netconf %d %d", ifindex, ncm->ncm_family);
 }
 
@@ -786,7 +796,8 @@ static int tc_msg_attr(const struct nlattr *attr, void *data)
 	return MNL_CB_OK;
 }
 
-static int qdisc_topic(const struct nlmsghdr *nlh, char *buf, size_t len)
+static int qdisc_topic(const struct nlmsghdr *nlh, char *buf, size_t len,
+		       uint32_t *ifindex)
 {
 	const struct tcmsg *tc = mnl_nlmsg_get_payload(nlh);
 	struct nlattr *tb[TCA_MAX + 1] = { NULL };
@@ -804,11 +815,13 @@ static int qdisc_topic(const struct nlmsghdr *nlh, char *buf, size_t len)
 		return -1;
 	}
 
+	*ifindex = tc->tcm_ifindex;
 	return snprintf(buf, len, "tc_qdisc %u %x %x %s", tc->tcm_ifindex,
 			tc->tcm_handle, tc->tcm_parent, kind);
 }
 
-static int filter_topic(const struct nlmsghdr *nlh, char *buf, size_t len)
+static int filter_topic(const struct nlmsghdr *nlh, char *buf, size_t len,
+			uint32_t *ifindex)
 {
 	const struct tcmsg *tc = mnl_nlmsg_get_payload(nlh);
 	struct nlattr *tb[TCA_MAX + 1] = { NULL };
@@ -826,11 +839,13 @@ static int filter_topic(const struct nlmsghdr *nlh, char *buf, size_t len)
 		return -1;
 	}
 
+	*ifindex = tc->tcm_ifindex;
 	return snprintf(buf, len, "tc_filter %u %x %x %x ", tc->tcm_ifindex,
 			tc->tcm_parent, chain_id, tc->tcm_info);
  }
 
-static int chain_topic(const struct nlmsghdr *nlh, char *buf, size_t len)
+static int chain_topic(const struct nlmsghdr *nlh, char *buf, size_t len,
+		       uint32_t *ifindex)
 {
 	const struct tcmsg *tc = mnl_nlmsg_get_payload(nlh);
 	struct nlattr *tb[TCA_MAX + 1] = { NULL };
@@ -848,6 +863,7 @@ static int chain_topic(const struct nlmsghdr *nlh, char *buf, size_t len)
 		return -1;
 	}
 
+	*ifindex = tc->tcm_ifindex;
 	return snprintf(buf, len, "tc_chain %u %x %x %x", tc->tcm_ifindex,
 			tc->tcm_parent, chain_id, tc->tcm_handle);
 }
@@ -855,16 +871,19 @@ static int chain_topic(const struct nlmsghdr *nlh, char *buf, size_t len)
 /* Generate a topic string to be sent by as subject
  * 0mq uses strings as pub/sub filtering.
  */
-int nl_generate_topic(const struct nlmsghdr *nlh, char *buf, size_t buflen)
+int nl_generate_topic(const struct nlmsghdr *nlh, char *buf, size_t buflen,
+		      uint32_t *ifindex)
 {
+	*ifindex = 0;
+
 	switch (nlh->nlmsg_type) {
 	case RTM_NEWLINK:
 	case RTM_DELLINK:
-		return link_topic(nlh, buf, buflen);
+		return link_topic(nlh, buf, buflen, ifindex);
 
 	case RTM_NEWADDR:
 	case RTM_DELADDR:
-		return address_topic(nlh, buf, buflen);
+		return address_topic(nlh, buf, buflen, ifindex);
 
 	case RTM_NEWROUTE:
 	case RTM_DELROUTE:
@@ -872,11 +891,11 @@ int nl_generate_topic(const struct nlmsghdr *nlh, char *buf, size_t buflen)
 
 	case RTM_NEWNEIGH:
 	case RTM_DELNEIGH:
-		return neigh_topic(nlh, buf, buflen);
+		return neigh_topic(nlh, buf, buflen, ifindex);
 
 	case RTM_NEWNETCONF:
 	case RTM_DELNETCONF:
-		return netconf_topic(nlh, buf, buflen);
+		return netconf_topic(nlh, buf, buflen, ifindex);
 
 #ifdef RTNLGRP_RTDMN
 	case RTM_NEWRTDMN:
@@ -885,15 +904,15 @@ int nl_generate_topic(const struct nlmsghdr *nlh, char *buf, size_t buflen)
 #endif
 	case RTM_NEWQDISC:
 	case RTM_DELQDISC:
-		return qdisc_topic(nlh, buf, buflen);
+		return qdisc_topic(nlh, buf, buflen, ifindex);
 
 	case RTM_NEWTFILTER:
 	case RTM_DELTFILTER:
-		return filter_topic(nlh, buf, buflen);
+		return filter_topic(nlh, buf, buflen, ifindex);
 
 	case RTM_NEWCHAIN:
 	case RTM_DELCHAIN:
-		return chain_topic(nlh, buf, buflen);
+		return chain_topic(nlh, buf, buflen, ifindex);
 
 	default:
 		info("unknown expected type %d", nlh->nlmsg_type);
