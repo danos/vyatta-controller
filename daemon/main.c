@@ -244,11 +244,12 @@ static int process_netlink_rtnl(const struct nlmsghdr *nlh, void *arg)
 	if (nl_generate_topic(nlh, topic, sizeof(topic), &ifindex) < 0)
 		return MNL_CB_OK;	/* unknown type */
 
-	/* Remember new interface to do netconf poll. */
-	if (arg && nlh->nlmsg_type == RTM_NEWLINK) {
+	if (nlh->nlmsg_type == RTM_NEWLINK) {
 		const struct ifinfomsg *ifi = mnl_nlmsg_get_payload(nlh);
 
-		if ((ifi->ifi_change & IFF_UP) && (ifi->ifi_flags & IFF_UP)) {
+		if (arg &&
+		    (ifi->ifi_change & IFF_UP) &&
+		    (ifi->ifi_flags & IFF_UP)) {
 			unsigned long if_index = ifi->ifi_index;
 
 			zlist_append(arg, (void *)if_index);
@@ -686,42 +687,6 @@ static void cmd_proxy(zsock_t *sock)
 	zmsg_destroy(&msg);
 }
 
-/* Send a separate request to get the interface's netconf info. */
-static void get_netconf(struct mnl_socket *nl, int ifindex, int family)
-{
-	char buf[MNL_SOCKET_BUFFER_SIZE];
-	struct nlmsghdr *nlh = mnl_nlmsg_put_header(buf);
-	unsigned portid = mnl_socket_get_portid(nl);
-	ssize_t len;
-
-	nlh->nlmsg_type = RTM_GETNETCONF;
-	nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
-	nlh->nlmsg_seq = ++dump_seq;
-
-	struct netconfmsg *ncm
-		= mnl_nlmsg_put_extra_header(nlh, sizeof(struct netconfmsg));
-	ncm->ncm_family = family;
-	mnl_attr_put_u32(nlh, NETCONFA_IFINDEX, ifindex);
-
-	if (mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0)
-		panic("mnl_socket_sendto netconf");
-
-	while ((len = mnl_socket_recvfrom(nl, buf, sizeof(buf))) > 0) {
-		int ret = mnl_cb_run(buf, len, dump_seq, portid,
-				     process_netlink_rtnl, NULL);
-		if (ret < MNL_CB_STOP) {
-			if (errno != ENOTSUP || debug)
-				notice("get_netconf %u/%u failed %s", ifindex,
-				       family, strerror(errno));
-		}
-		if (ret <= MNL_CB_STOP)
-			break;
-	}
-
-	if (len == -1)
-		panic("mnl_socket_recvfrom");
-}
-
 /* Request current state from kernel and put in storage and publish */
 static void dump_kernel(struct mnl_socket *nl, int family, int type,
 			int ifindex, mnl_cb_t callback, void *arg)
@@ -775,23 +740,6 @@ static void dump_kernel(struct mnl_socket *nl, int family, int type,
 
 	if (len < 0)
 		panic("mnl_socket_recvfrom");
-}
-
-static void get_all_netconf(struct mnl_socket *nl, zlist_t *if_list)
-{
-	/* Note: zlist stores a void *, but since we only need interface
-	 * index (and 0 is not a valid ifindex), okay to use a cast
-	 * to go from pointer to index.
-	 */
-	void *key;
-
-	for (key = zlist_first(if_list); key; key = zlist_next(if_list)) {
-		unsigned long ifindex = (unsigned long) key;
-
-		get_netconf(nl, ifindex, AF_INET);
-		get_netconf(nl, ifindex, AF_INET6);
-		get_netconf(nl, ifindex, AF_MPLS);
-	}
 }
 
 static void get_all_tc(struct mnl_socket *nl, zlist_t *if_list)
@@ -1024,7 +972,6 @@ static void get_kernel(struct mnl_socket *nl)
 	dump_kernel(nl, AF_PACKET, RTM_GETLINK, -1, process_netlink_rtnl, if_list);
 	/* all bridges */
 	dump_kernel(nl, AF_BRIDGE, RTM_GETLINK, -1, process_netlink_rtnl, if_list);
-	get_all_netconf(nl, if_list);
 	get_all_tc(nl, if_list);
 	zlist_destroy(&if_list);
 
@@ -1047,15 +994,9 @@ static void get_kernel(struct mnl_socket *nl)
 	}
 }
 
-static void netlink_listener(struct mnl_socket *listen_nl,
-			     struct mnl_socket *req_nl)
+static void netlink_listener(struct mnl_socket *listen_nl)
 {
-	zlist_t *if_list = zlist_new();
 	int i;
-
-	if (!if_list)
-		panic("zlist_new");
-
 	char rcvbufs[NL_MAXMSGS][NL_MAXMSGSIZE];
 	struct mmsghdr msgvec[NL_MAXMSGS];
 	struct iovec iovs[NL_MAXMSGS];
@@ -1082,7 +1023,7 @@ static void netlink_listener(struct mnl_socket *listen_nl,
 
 	if (vlen < 0) {
 		notice("error getting netlink messages: %s", strerror(errno));
-		goto out;
+		return;
 	}
 
 	for (i = 0; i < vlen; i++) {
@@ -1103,7 +1044,7 @@ static void netlink_listener(struct mnl_socket *listen_nl,
 		}
 
 		int ret = mnl_cb_run(rcvbuf, len, 0, 0,
-				     process_netlink_rtnl, if_list);
+				     process_netlink_rtnl, NULL);
 		if (ret < MNL_CB_STOP) {
 			notice("error parsing netlink message: %s",
 							strerror(errno));
@@ -1111,10 +1052,6 @@ static void netlink_listener(struct mnl_socket *listen_nl,
 				mnl_nlmsg_fprintf(stdout, rcvbuf, len, len);
 		}
 	}
-
-out:
-	get_all_netconf(req_nl, if_list);
-	zlist_destroy(&if_list);
 }
 
 static void xfrm_listener(struct mnl_socket *xfrm_nl)
@@ -1764,7 +1701,7 @@ int main(int argc, char **argv)
 		}
 
 		if (items[0].revents & ZMQ_POLLIN)
-			netlink_listener(listen_nl, req_nl);
+			netlink_listener(listen_nl);
 
 		if (items[0].revents & ZMQ_POLLERR)
 			nl_socket_error("listen", listen_nl);
