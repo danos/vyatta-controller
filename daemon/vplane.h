@@ -88,6 +88,18 @@ int vplane_iface_add(vplane_t *vp, uint32_t ifn, uint32_t ifindex,
 void *vplane_iface_get_cookie(const vplane_t *vp, uint32_t ifn);
 int vplane_iface_set_cookie(const vplane_t *vp, uint32_t ifn, void *cookie);
 
+bool vplane_iface_get_delpend(const vplane_t *vp, uint32_t ifn);
+int vplane_iface_set_delpend(const vplane_t *vp, uint32_t ifn, bool delpend);
+
+/*
+ * Function used to iterate (walk) all defined interfaces for a
+ * specific vplane instance
+ */
+typedef void vplane_iface_iter_func_t(const vplane_t *vp, uint32_t ifn,
+				      void *arg);
+void vplane_iface_iterate(const vplane_t *vp, vplane_iface_iter_func_t func,
+			  void *arg);
+
 /*
  * Using the message envelope as the session key, mark a vplane as
  * connected.

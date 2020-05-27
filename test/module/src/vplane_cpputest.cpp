@@ -41,7 +41,6 @@ int zmsg_popu32(zmsg_t *msg, uint32_t *p)
 {
 	return 0;
 }
-
 }
 
 TEST_GROUP(vplane)
@@ -331,6 +330,14 @@ TEST(vplane, connect)
 	}
 }
 
+void vptest_interface_count(const vplane_t *vp, uint32_t ifn, void *arg)
+{
+	int *count = (int *)arg;
+
+	CHECK(vplane_iface_get_ifindex(vp, ifn) != 0);
+	(*count)++;
+}
+
 TEST(vplane, interface)
 {
 	const char *addrstr = "10.1.1.1";
@@ -383,6 +390,27 @@ TEST(vplane, interface)
 	CHECK(vplane_iface_add(vp, 3, 1003, ifname) == 0);
 	CHECK(streq("cookie1", vplane_iface_get_ifname(vp, 3)));
 	CHECK(vplane_iface_get_ifindex(vp, 3) == 1003);
+
+	int ifcount;
+
+	CHECK(vplane_iface_add(vp, 2, 1002, "s2") == 0);
+	CHECK(vplane_iface_get_ifindex(vp, 2) == 1002);
+	CHECK(streq("s2", vplane_iface_get_ifname(vp, 2)));
+	CHECK(vplane_iface_add(vp, 3, 1003, "s3") == 0);
+	CHECK(vplane_iface_get_ifindex(vp, 3) == 1003);
+	CHECK(streq("s3", vplane_iface_get_ifname(vp, 3)));
+
+	ifcount = 0;
+	vplane_iface_iterate(vp, vptest_interface_count, &ifcount);
+	CHECK(ifcount == 2);
+	vplane_iface_del(vp, 2);
+	ifcount = 0;
+	vplane_iface_iterate(vp, vptest_interface_count, &ifcount);
+	CHECK(ifcount == 1);
+	vplane_iface_del(vp, 3);
+	ifcount = 0;
+	vplane_iface_iterate(vp, vptest_interface_count, &ifcount);
+	CHECK(ifcount == 0);
 }
 
 TEST(vplane, address)

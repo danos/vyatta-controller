@@ -554,6 +554,12 @@ static int connect_get_json_errors(const char *topic __unused,
 	return 0;
 }
 
+static void interface_delete_pending(const vplane_t *vp, uint32_t ifn,
+				     void *arg __unused)
+{
+	vplane_iface_set_delpend(vp, ifn, true);
+}
+
 /*
  * Parse connect message from vplane:
  *
@@ -603,6 +609,13 @@ static int connect_request(request_t *req, zmsg_t *msg)
 
 	if (error != CONNECT_ERROR_NONE)
 		connect_error_log(error, uuid);
+	else
+		/*
+		 * dataplane restart, mark the current set of ports as
+		 * delete pending; the attribute is cleared as each
+		 * port is (re-)created.
+		 */
+		vplane_iface_iterate(vp, interface_delete_pending, NULL);
 
 	free(uuid);
 	free(control);
@@ -845,6 +858,7 @@ static int iniport_request(request_t *req, zmsg_t *msg)
 		goto err;
 	}
 
+	vplane_iface_set_delpend(req->vp, req->portno, false);
 	send_port_response(req, req->portno, ifname, seqno);
 	return 0;
 
@@ -1146,6 +1160,59 @@ static int mrt_request(request_t *req, zmsg_t *msg)
 	return 0;
 }
 
+/*
+ * An interface is no longer part of the dataplane configuration. Need
+ * to remove the link from the snapshot database. Get the main thread
+ * to issue a "fake" DELLINK message for the given interface.
+ */
+static void snapshot_interface_purge(const vplane_t *vp, uint32_t ifn,
+				     void *arg)
+{
+	request_t *req = arg;
+	const char *action;
+	const char *ifname;
+	uint32_t ifindex;
+	zmsg_t *msg;
+	int rc = 0;
+
+	if (!vplane_iface_get_delpend(vp, ifn))
+		return;
+
+	ifindex = vplane_iface_get_ifindex(vp, ifn);
+	ifname = vplane_iface_get_ifname(vp, ifn);
+	action = "allocate";
+	msg = zmsg_new();
+	if (msg == NULL) {
+		rc = -1;
+		goto done;
+	}
+
+	action = "build";
+	rc = zmsg_addstr(msg, "PURGEINK");
+	if (rc < 0)
+		goto done;
+
+	rc = zmsg_addmem(msg, &ifindex, sizeof(ifindex));
+	if (rc < 0)
+		goto done;
+
+	rc = zmsg_addstr(msg, ifname);
+	if (rc < 0)
+		goto done;
+
+	action = "send";
+	rc = zmsg_send(&msg, req->pipe);
+	if (rc < 0)
+		goto done;
+
+done:
+	vplane_iface_del((vplane_t *)vp, ifn);
+	if (rc != 0)
+		err("vplane(%d) failed to %s purge %s message",
+		    vplane_get_id(vp), action, ifname);
+	zmsg_destroy(&msg);
+}
+
 static void do_snapshot(request_t *req, const char *who, bool skip_cstore)
 {
 	int vpid = vplane_get_id(req->vp);
@@ -1229,10 +1296,17 @@ static int snapshot_request(request_t *req, zmsg_t *msg __unused)
 	env_frame = zframe_new(zframe_data(*req->envelope),
 			       zframe_size(*req->envelope));
 
-	if (env_frame)
+	if (env_frame) {
+		/*
+		 * Purge any snapshot link entries associated with
+		 * interfaces that no longer exist (marked as delete
+		 * pending)
+		 */
+		vplane_iface_iterate(req->vp, snapshot_interface_purge, req);
+
 		rc = zsock_send(req->pipe, "sppf", "SNAPMARK",
 				req->sock, req->snap, env_frame);
-	else
+	} else
 		rc = -ENOMEM;
 
 	zframe_destroy(&env_frame);

@@ -1375,6 +1375,61 @@ static void gectrl_listener(struct mnl_socket *gectrl_nl)
 }
 
 /*
+ * Need to remove an interface (link) from the snapshot
+ * database. Generate a fake RTM_DELLINK message and inject it into
+ * the netlink handler. See snapshot_interface_purge().
+ */
+static void purge_link(zmsg_t *msg)
+{
+	char nlhbuf[MNL_SOCKET_BUFFER_SIZE];
+	struct nlmsghdr *nlh;
+	struct ifinfomsg *ifi;
+	zframe_t *frame;
+	uint32_t ifindex;
+	char *ifname;
+
+	frame = zmsg_pop(msg);
+	zframe_destroy(&frame);
+
+	if (zmsg_popu32(msg, &ifindex) < 0) {
+		err("%s() missing ifindex field", __func__);
+		return;
+	}
+
+	ifname = zmsg_popstr(msg);
+	if (ifname == NULL) {
+		err("%s() missing ifname field", __func__);
+		return;
+	}
+
+	memset(nlhbuf, 0, sizeof(nlhbuf));
+	nlh = mnl_nlmsg_put_header(nlhbuf);
+	nlh->nlmsg_type = RTM_DELLINK;
+	nlh->nlmsg_pid = getpid();
+
+	ifi = (struct ifinfomsg *)mnl_nlmsg_put_extra_header(
+		nlh, sizeof(struct ifinfomsg));
+	ifi->ifi_family = AF_UNSPEC;
+	ifi->ifi_index = ifindex;
+	ifi->ifi_change = -1;
+
+	int len = strlen(ifname) + 1;
+	struct rtattr *rta = (struct rtattr *)mnl_nlmsg_put_extra_header(
+		nlh, sizeof(struct rtattr) + len);
+	rta->rta_type = IFLA_IFNAME;
+	rta->rta_len = RTA_LENGTH(len);
+	memcpy(RTA_DATA(rta), ifname, len);
+	nlh->nlmsg_len = NLMSG_ALIGN(nlh->nlmsg_len) + RTA_LENGTH(len);
+
+	info("purging link %s (%u)", ifname, ifindex);
+
+	if (process_netlink_rtnl(nlh, NULL) != MNL_CB_OK)
+		err("%s() process_netlink_rtnl() failed", __func__);
+
+	free(ifname);
+}
+
+/*
  * Receive a message from the request thread.
  *
  * The only one we expect is asking us to insert a snapshot marker into
@@ -1392,11 +1447,15 @@ static void request_event(zsock_t *request_ipc)
 
 	frame = zmsg_first(msg);
 
-	if (frame && zframe_streq(frame, "SNAPMARK")) {
+	if (frame == NULL)
+		err("missing name in message from request thread");
+	else if (zframe_streq(frame, "SNAPMARK")) {
 		if (zmsg_send(&msg, request_ipc) < 0)
-			err("Failed to send snapshot marker back to requestor");
+			err("Failed to send snapshot marker back to request thread");
+	} else if (zframe_streq(frame, "PURGEINK")) {
+		purge_link(msg);
 	} else
-		err("Unexpected message from requestor");
+		err("Unexpected message from request thread");
 
 	zmsg_destroy(&msg);
 }

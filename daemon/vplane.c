@@ -81,6 +81,7 @@ typedef struct vplaneif_ {
 	uint32_t operstate;
 	int fd;
 	void *cookie;
+	bool delpend;
 	char ifname[IFNAMSIZ];
 } vplaneif_t;
 
@@ -434,6 +435,7 @@ vplane_iface_add(vplane_t *vp, uint32_t ifn, uint32_t ifindex,
 
 	vpif->ifindex = ifindex;
 	vpif->operstate = IF_OPER_UNKNOWN;
+	vpif->delpend = false;
 	int sz = sizeof(vpif->ifname);
 
 	strncpy(vpif->ifname, ifname, sz-1);
@@ -467,6 +469,46 @@ int vplane_iface_set_cookie(const vplane_t *vp, uint32_t ifn, void *cookie)
 	}
 
 	return -1;
+}
+
+bool vplane_iface_get_delpend(const vplane_t *vp, uint32_t ifn)
+{
+	vplaneif_t *vpif;
+
+	vpif = vplane_iface_get(vp, ifn, true, "iface_get_delpend");
+	if (vpif != NULL)
+		return vpif->delpend;
+
+	return false;
+}
+
+int vplane_iface_set_delpend(const vplane_t *vp, uint32_t ifn, bool delpend)
+{
+	vplaneif_t *vpif;
+
+	vpif = vplane_iface_get(vp, ifn, true, "iface_set_delpend");
+	if (vpif != NULL) {
+		vpif->delpend = delpend;
+		dbg("vplane(%d.%u) %s delete pending %d",
+		    vp->id, ifn, vpif->ifname, delpend);
+		return 0;
+	}
+
+	return -1;
+}
+
+void vplane_iface_iterate(const vplane_t *vp, vplane_iface_iter_func_t func,
+			  void *arg)
+{
+	uint32_t iface;
+
+	for (iface = 0; iface < MAX_PORTS; iface++) {
+		vplaneif_t *vpif;
+
+		vpif = vp->interfaces[iface];
+		if (vpif != NULL)
+			(func)(vp, iface, arg);
+	}
 }
 
 static void
