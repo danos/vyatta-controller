@@ -1,3 +1,18 @@
+vplane-controller (3.6.4) unstable; urgency=medium
+
+  [ Michael Doyle ]
+  * Update License
+
+  [ Mark Gillott ]
+  * ports: replace NEWPORT with INIPORT & ADDPORT (Fixes: VRVDR-46511)
+  * netlink: ensure interface exists before publishing other messages
+    (Fixes: VRVDR-46511)
+  * ut: add unit-test module for netlink message handling (Fixes: VRVDR-46511)
+  * netlink: don't bother to explicitly collect netconf
+  * snapshot: clear dead ports from snapshot (Fixes: VRVDR-46511)
+
+ -- Mark Gillott <mgillott@vyatta.att-mail.com>  Fri, 29 May 2020 14:39:12 +0100
+
 vplane-controller (3.6.3) unstable; urgency=medium
 
   * Don't sort cstore items that are bound to an interface (Fixes: VRVDR-50606)
