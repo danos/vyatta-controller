@@ -253,6 +253,13 @@ int port_create(const vplane_t *vp, uint32_t port, const char *ifname,
 		port_tap_fd(vp, port, ifname, false);
 	}
 
+	/*
+	 * Override the kernel default speed & duplex with unknown in
+	 * case we don't get any LINKUP/LINKDOWN messages from the
+	 * dataplane for this interface.
+	 */
+	port_set_speed(ifname, SPEED_UNKNOWN, DUPLEX_UNKNOWN, 0, true);
+
 	if (driver)
 		port_set_info(ifname, driver, bus, if_flags, mtu);
 
