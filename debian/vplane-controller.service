@@ -15,7 +15,7 @@ ExecStartPre=-/sbin/modprobe l2tp_netlink
 ExecStartPre=/lib/vplane/hwbinding /config/config.boot
 ExecStartPre=/bin/bash -c "rm -f /var/run/vyatta/*.stats"
 Environment=VPLANED_DEBUG_FLAG=""
-ExecStart=/opt/vyatta/sbin/vplaned ${VPLANED_DEBUG_FLAG} -u vplaned -g adm -l /var/log/vyatta/vplaned.log
+ExecStart=/opt/vyatta/sbin/vplaned ${VPLANED_DEBUG_FLAG} -u vplaned -g adm
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 TimeoutStartSec=90s
