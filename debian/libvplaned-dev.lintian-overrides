@@ -1,2 +1,1 @@
-libvplaned-dev: changelog-file-missing-in-native-package
 libvplaned-dev: executable-not-elf-or-script usr/lib/pkgconfig/libvplaned.pc

@@ -1,3 +1,2 @@
 vplane-controller: file-in-unusual-dir
 vplane-controller: dir-or-file-in-opt
-vplane-controller: changelog-file-missing-in-native-package

@@ -20,8 +20,5 @@ endif
 %:
 	dh $@ --parallel --with systemd
 
-# No changelog
-override_dh_installchangelogs:
-
 override_dh_strip:
 	dh_strip --dbg-package=vplane-controller-dbg
