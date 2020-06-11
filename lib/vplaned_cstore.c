@@ -50,6 +50,7 @@ struct cstore_args {
 	const char *cmd;
 	const char *action;
 	const char *interface;
+	bool protobuf;
 };
 
 static json_object *
@@ -78,6 +79,7 @@ vplaned_cstore_format(const char *token, const struct cstore_args *args)
 
 	json_object *cmdstr = json_object_new_string(args->cmd);
 	json_object *intfstr = json_object_new_string(args->interface);
+	json_object *protobufstr = NULL;
 
 	if ((cmdstr != NULL) && (intfstr != NULL)) {
 		char actbuf[64];
@@ -85,6 +87,12 @@ vplaned_cstore_format(const char *token, const struct cstore_args *args)
 		snprintf(actbuf, sizeof(actbuf), "__%s__", args->action);
 		json_object_object_add(parent, actbuf, cmdstr);
 		json_object_object_add(parent, "__INTERFACE__", intfstr);
+		if (args->protobuf) {
+			protobufstr = json_object_new_boolean(args->protobuf);
+			if (protobufstr)
+				json_object_object_add(parent, "__PROTOBUF__",
+						       protobufstr);
+		}
 		return parent;
 	}
 
@@ -97,7 +105,7 @@ vplaned_cstore_format(const char *token, const struct cstore_args *args)
 static int
 vplaned_cstore_request_internal(zsock_t *sock, const char *path,
 				const char *cmd, const char *interface,
-				const char *action)
+				const char *action, bool protobuf)
 {
 	struct cstore_args args;
 
@@ -109,6 +117,7 @@ vplaned_cstore_request_internal(zsock_t *sock, const char *path,
 
 	args.cmd = cmd;
 	args.action = action;
+	args.protobuf = protobuf;
 	if (interface == NULL)
 		args.interface = "ALL";
 	else
@@ -148,7 +157,7 @@ vplaned_cstore_request(zsock_t *sock, const char *path, const char *cmd,
 		       const char *interface, const char *action)
 {
 	return vplaned_cstore_request_internal(sock, path, cmd,
-					       interface, action);
+					       interface, action, false);
 }
 
 int
