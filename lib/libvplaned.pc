@@ -1,4 +1,4 @@
-# Copyright (c) 2019, AT&T Intellectual Property. All rights reserved.
+# Copyright (c) 2019-2020, AT&T Intellectual Property. All rights reserved.
 # Copyright (c) 2016 by Brocade Communications Systems, Inc.
 # All rights reserved.
 #
@@ -18,6 +18,6 @@ Version: 0.1.0
 
 Requires:
 
-Libs: -L${libdir} -lvplaned
+Libs: -L${libdir} -lvplaned -lb64 -lprotobuf-c
 Cflags: -I${includedir}
 Libs.private: -lczmq -lzmq -ljson-c

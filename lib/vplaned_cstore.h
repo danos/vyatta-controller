@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019, AT&T Intellectual Property.
+ * Copyright (c) 2018-2020, AT&T Intellectual Property.
  * All rights reserved.
  *
  * SPDX-License-Identifier: LGPL-2.1-only
@@ -72,6 +72,28 @@ vplaned_cstore_disconnect(zsock_t **sock);
 extern int
 vplaned_cstore_request(zsock_t *sock, const char *path, const char *cmd,
 		       const char *interface, const char *action);
+
+/*
+ * Pass a command protobuf object to the cstore subsystem inside vplaned
+ *
+ * sock - ZMQ connection to the controller
+ * path - Path to stored object (the "key")
+ * cmd  - Configuration string to be stored with "key" (the "value")
+ *        This is a protobuf encoded message.
+ * cmd_len - The length of 'cmd'
+ * cmd_name - the name of the handler when the msg reaches the dataplane.
+ * interface - Optional interface name used to augment the "key", if
+ *             absent, "ALL" is used.
+ * action - How the "key"/"value" pair is to be processed: "SET" or "DELETE"
+ *
+ * Returns 0 on success and a negative (< 0) errno value on failure
+ */
+extern int
+vplaned_cstore_pb_request(zsock_t *sock, const char *path, void *cmd,
+			  int cmd_len,
+			  const char *cmd_name,
+			  const char *interface, const char *action);
+
 
 /*
  * Retrieve the result of the previous cstore request from the controller.

@@ -1,20 +1,30 @@
-# Copyright (c) 2018-2019, AT&T Intellectual Property. All rights reserved.
+# Copyright (c) 2018-2020, AT&T Intellectual Property. All rights reserved.
 # Copyright (c) 2016 by Brocade Communications Systems, Inc.
 # All rights reserved.
 #
 # SPDX-License-Identifier: LGPL-2.1-only
 
 CFLAGS += -g -fPIC
-CFLAGS += $(shell pkg-config --cflags libczmq json-c)
+CFLAGS += $(shell pkg-config --cflags libczmq json-c libprotobuf-c)
+
 
 NAME := vplaned
-OBJS := vplaned_cfg.o vplaned_cstore.o vplaned_event.o
+OBJS := vplaned_cfg.o vplaned_cstore.o vplaned_event.o DataplaneEnvelope.pb-c.o \
+	VPlanedEnvelope.pb-c.o
 LIB := lib$(NAME).a
 
 all: lib
 
 lib: $(OBJS)
 	$(AR) rs $(LIB) $(OBJS)
+
+vplaned_cstore.o: DataplaneEnvelope.pb-c.h VPlanedEnvelope.pb-c.h
+
+DataplaneEnvelope.pb-c.c DataplaneEnvelope.pb-c.h:
+	protoc-c --c_out=. -I=/usr/share/vyatta-dataplane/protobuf/ $(DESTDIR)/usr/share/vyatta-dataplane/protobuf/DataplaneEnvelope.proto
+
+VPlanedEnvelope.pb-c.c VPlanedEnvelope.pb-c.h:
+	protoc-c --c_out=. -I=../protobuf ../protobuf/VPlanedEnvelope.proto
 
 clean:
 	$(RM) $(LIB) $(OBJS)
