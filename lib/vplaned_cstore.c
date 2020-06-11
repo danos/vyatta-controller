@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019, AT&T Intellectual Property.
+ * Copyright (c) 2018-2020, AT&T Intellectual Property.
  * All rights reserved.
  *
  * SPDX-License-Identifier: LGPL-2.1-only
@@ -94,9 +94,10 @@ vplaned_cstore_format(const char *token, const struct cstore_args *args)
 	return NULL;
 }
 
-int
-vplaned_cstore_request(zsock_t *sock, const char *path, const char *cmd,
-		       const char *interface, const char *action)
+static int
+vplaned_cstore_request_internal(zsock_t *sock, const char *path,
+				const char *cmd, const char *interface,
+				const char *action)
 {
 	struct cstore_args args;
 
@@ -140,6 +141,14 @@ vplaned_cstore_request(zsock_t *sock, const char *path, const char *cmd,
 
 	json_object_put(jobj);
 	return rc;
+}
+
+int
+vplaned_cstore_request(zsock_t *sock, const char *path, const char *cmd,
+		       const char *interface, const char *action)
+{
+	return vplaned_cstore_request_internal(sock, path, cmd,
+					       interface, action);
 }
 
 int
