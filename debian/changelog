@@ -1,3 +1,11 @@
+vplane-controller (3.6.3.1) unstable; urgency=medium
+
+  [ Robert Shearman ]
+  * port: set ethtool speed/duplex values to unknown on creating a port
+    (Fixes: VRVDR-45369)
+
+ -- Mark Gillott <mgillott@vyatta.att-mail.com>  Mon, 15 Jun 2020 11:32:28 +0100
+
 vplane-controller (3.6.3) unstable; urgency=medium
 
   * Don't sort cstore items that are bound to an interface (Fixes: VRVDR-50606)
