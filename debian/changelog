@@ -1,3 +1,15 @@
+vplane-controller (3.6.5) unstable; urgency=medium
+
+  [ Robert Shearman ]
+  * port: set ethtool speed/duplex values to unknown on creating a port
+    (Fixes: VRVDR-45369)
+
+  [ Nicholas Brown ]
+  * Install package changelogs
+  * Don't log to a file, let systemd redirect to journal
+
+ -- Mark Gillott <mgillott@vyatta.att-mail.com>  Mon, 15 Jun 2020 11:30:54 +0100
+
 vplane-controller (3.6.4) unstable; urgency=medium
 
   [ Michael Doyle ]
