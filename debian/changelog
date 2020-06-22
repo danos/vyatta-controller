@@ -1,3 +1,13 @@
+vplane-controller (3.6.6) unstable; urgency=medium
+
+  [ Paul Atkins ]
+  * cstore: add an internal version of vplaned_cstore_request
+  * cstore: modify vplaned_cstore_request_internal to support pbs
+  * cstore: add an api to store config in a protobuf message
+  * lib: change libvplaned to be a shared library
+
+ -- Mark Gillott <mgillott@vyatta.att-mail.com>  Mon, 22 Jun 2020 16:50:31 +0100
+
 vplane-controller (3.6.5) unstable; urgency=medium
 
   [ Robert Shearman ]
