@@ -1,3 +1,3 @@
 usr/include/*.h
 usr/lib/*/libvplaned.so
-usr/lib/pkgconfig/libvplaned.pc
+usr/lib/*/pkgconfig/libvplaned.pc

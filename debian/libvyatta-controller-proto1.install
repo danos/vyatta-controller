@@ -1,2 +1,1 @@
-#!/usr/bin/dh-exec
-protobuf/libvyatta-controller-proto.so.1 usr/lib/${DEB_HOST_MULTIARCH}
+/usr/lib/*/libvyatta-controller-proto.so.*

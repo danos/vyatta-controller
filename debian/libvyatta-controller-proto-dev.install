@@ -1,4 +1,3 @@
-#!/usr/bin/dh-exec
-protobuf/VPlanedEnvelope.pb.h usr/include/vyatta-controller/proto
-protobuf/vyatta-controller-proto.pc usr/lib/${DEB_HOST_MULTIARCH}/pkgconfig
-protobuf/libvyatta-controller-proto.so usr/lib/${DEB_HOST_MULTIARCH}
+usr/include/vyatta-controller/proto/VPlanedEnvelope.pb.h
+usr/lib/*/pkgconfig/vyatta-controller-proto.pc
+usr/lib/*/libvyatta-controller-proto.so

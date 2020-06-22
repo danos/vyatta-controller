@@ -1,3 +1,3 @@
-protobuf/VPlanedEnvelope.proto usr/share/vyatta-dataplane/protobuf
-scripts/VPlanedEnvelope.pm usr/share/perl5/vyatta/proto
-scripts/VPlanedEnvelope_pb2.py usr/lib/python3/dist-packages/vyatta/proto
+usr/share/vyatta-dataplane/protobuf/VPlanedEnvelope.proto
+usr/share/perl5/vyatta/proto/VPlanedEnvelope.pm
+usr/lib/python3/dist-packages/vyatta/proto/VPlanedEnvelope_pb2.py
