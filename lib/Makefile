@@ -7,16 +7,18 @@
 CFLAGS += -g -fPIC
 CFLAGS += $(shell pkg-config --cflags libczmq json-c libprotobuf-c)
 
+LDFLAGS +=  $(shell pkg-config --libs libczmq json-c libprotobuf-c)
+LDFLAGS += -shared -lb64 -Wl,-soname,libvplaned.so.1
 
 NAME := vplaned
 OBJS := vplaned_cfg.o vplaned_cstore.o vplaned_event.o DataplaneEnvelope.pb-c.o \
 	VPlanedEnvelope.pb-c.o
-LIB := lib$(NAME).a
+LIB := lib$(NAME).so
 
 all: lib
 
 lib: $(OBJS)
-	$(AR) rs $(LIB) $(OBJS)
+	$(CC) $(LDFLAGS) -o $(LIB) $(OBJS)
 
 vplaned_cstore.o: DataplaneEnvelope.pb-c.h VPlanedEnvelope.pb-c.h
 
@@ -36,4 +38,5 @@ install: $(LIB) vplaned.h vplaned_cfg.h vplaned_cstore.h vplaned_event.h \
 	install -D vplaned_cstore.h $(DESTDIR)/usr/include/vplaned_cstore.h
 	install -D vplaned_event.h $(DESTDIR)/usr/include/vplaned_event.h
 	install -D libvplaned.pc $(DESTDIR)/usr/lib/pkgconfig/libvplaned.pc
-	install -D $(LIB) $(DESTDIR)/usr/lib/$(LIB)
+	install -D $(LIB) $(DESTDIR)/usr/lib/${DEB_HOST_MULTIARCH}/$(LIB).1
+	ln -sr $(DESTDIR)/usr/lib/${DEB_HOST_MULTIARCH}/$(LIB).1 $(DESTDIR)/usr/lib/${DEB_HOST_MULTIARCH}/$(LIB)
