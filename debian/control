@@ -31,7 +31,11 @@ Package: libvplaned-dev
 Architecture: any
 Priority: optional
 Section: libdevel
-Depends: ${misc:Depends}, ${shlibs:Depends}, libvplaned1 (= ${binary:Version})
+Depends: ${misc:Depends},
+ libvplaned1 (= ${binary:Version}),
+ libczmq-dev,
+ libjson-c-dev,
+ libprotobuf-c-dev
 Description: Vyatta development package for the controller
  Development header and library files for the Vyatta controller access
  library.
