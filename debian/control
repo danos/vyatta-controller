@@ -25,7 +25,7 @@ Build-Depends: debhelper (>= 9),
  golang-goprotobuf-dev,
  libprotobuf-dev,
  libvyatta-dataplane-proto-support,
-Standards-Version: 3.9.6
+Standards-Version: 4.3.0
 
 Package: libvplaned-dev
 Architecture: any
