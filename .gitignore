@@ -5,6 +5,11 @@ debian/files
 debian/libvplaned-dev/
 debian/vplane-controller/
 debian/vplane-controller-dbg/
+debian/golang-github-danos-vyatta-controller-protobuf-dev/
+debian/libvplaned1/
+debian/libvyatta-controller-proto-dev/
+debian/libvyatta-controller-proto-support/
+debian/libvyatta-controller-proto1/
 debian/*.log
 debian/*.substvars
 debian/*.debhelper
