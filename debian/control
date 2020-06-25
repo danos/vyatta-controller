@@ -35,7 +35,8 @@ Depends: ${misc:Depends},
  libvplaned1 (= ${binary:Version}),
  libczmq-dev,
  libjson-c-dev,
- libprotobuf-c-dev
+ libprotobuf-c-dev,
+ libb64-dev
 Description: Vyatta development package for the controller
  Development header and library files for the Vyatta controller access
  library.
