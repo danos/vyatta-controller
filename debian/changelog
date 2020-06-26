@@ -1,3 +1,16 @@
+vplane-controller (3.6.7) unstable; urgency=medium
+
+  [ Nicholas Brown ]
+  * fix syntax-error-in-dep5-copyright lintian error
+  * git ignore additional package build directories
+  * fix ancient-standards-version lintian error
+  * Add missing dependencies to libvplaned-dev
+  * add missing dev dependency
+  * Correct dependencies on perl/python for protobuf libraries
+  * Only install header in the top level dir
+
+ -- Mark Gillott <mgillott@vyatta.att-mail.com>  Fri, 26 Jun 2020 13:23:30 +0100
+
 vplane-controller (3.6.6) unstable; urgency=medium
 
   [ Paul Atkins ]
