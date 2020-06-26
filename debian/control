@@ -69,9 +69,11 @@ Description: Debugging symbols for vplane-controller
 Package: libvyatta-controller-proto-support
 Section: devel
 Architecture: all
-Depends: ${misc:Depends}
-Description: Vyatta controller protocol buffer file for language support
- Perl file needed to build protobuf messages to talk to the controller
+Depends: ${misc:Depends}, ${perl:Depends}, python3,
+ libgoogle-protocolbuffers-perl,
+ python3-protobuf
+Description: Vyatta controller protocol buffer files for language support
+ Perl and Python files to build protobuf messages to talk to the controller
 
 Package: golang-github-danos-vyatta-controller-protobuf-dev
 Architecture: all
