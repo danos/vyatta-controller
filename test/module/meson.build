@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: LGPL-2.1-only
+# Copyright (c) 2020, AT&T Intellectual Property.
+
 cpputest_dep = dependency('cpputest')
 
 common_test_includes = include_directories(

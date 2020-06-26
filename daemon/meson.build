@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: LGPL-2.1-only
+# Copyright (c) 2020, AT&T Intellectual Property.
+
 daemon_sources = files(
         'configcmd.c',
         'configdb.c',

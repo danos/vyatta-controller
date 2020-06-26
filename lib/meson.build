@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: LGPL-2.1-only
+# Copyright (c) 2020, AT&T Intellectual Property.
+
 vplaned_library_sources = files(
         'vplaned_cfg.c',
         'vplaned_cstore.c',
