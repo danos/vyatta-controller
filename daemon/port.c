@@ -240,11 +240,11 @@ int port_create(const vplane_t *vp, uint32_t port, const char *ifname,
 
 	*ifindexp = ifindex = if_nametoindex(ifname);
 
+	/* put the tap into dormant mode */
+	tun_set_dormant(tun, ifname);
+
 	/* Is this dataplane running on the controller? */
 	if (!vplane_is_local(vp)) {
-		/* put the tap into dormant mode */
-		tun_set_dormant(tun, ifname);
-
 		/* Toggle to restore correct IPv6 address/state if admin UP*/
 		if (tun_admin_is_up(tun, ifindex) == true)
 			tun_admin_toggle(tun, ifindex);
@@ -275,22 +275,23 @@ int port_create(const vplane_t *vp, uint32_t port, const char *ifname,
 int port_delete(const vplane_t *vp, uint32_t port,
 		uint32_t ifindex)
 {
+	const char *ifname;
+
 	/* Is this dataplane running on the controller? */
-	if (vplane_is_local(vp)) {
-		if (ifindex == 0)
-			goto bad;
-	} else {
-		const char *ifname = vplane_iface_get_ifname(vp, port);
+	if (vplane_is_local(vp) && ifindex == 0)
+		goto bad;
 
-		/* vplane_iface_get_ifname does its own logging on failure */
-		if (!ifname)
-			goto bad;
+	ifname = vplane_iface_get_ifname(vp, port);
 
+	/* vplane_iface_get_ifname does its own logging on failure */
+	if (!ifname)
+		goto bad;
+
+	if (!vplane_is_local(vp))
 		port_tap_fd(vp, port, ifname, false);
 
-		if (port_teardown(ifindex, ifname) < 0)
-			goto bad;
-	}
+	if (port_teardown(ifindex, ifname) < 0)
+		goto bad;
 
 	return 0;
 
