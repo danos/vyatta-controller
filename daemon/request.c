@@ -1206,6 +1206,11 @@ static void snapshot_interface_purge(const vplane_t *vp, uint32_t ifn,
 		goto done;
 
 done:
+	if (rc >= 0) {
+		action = "delete port after";
+		rc = port_delete(vp, ifn, ifindex);
+	}
+
 	vplane_iface_del((vplane_t *)vp, ifn);
 	if (rc != 0)
 		err("vplane(%d) failed to %s purge %s message",
