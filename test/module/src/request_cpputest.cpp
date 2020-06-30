@@ -138,12 +138,11 @@ int port_create(const vplane_t *vp, uint32_t port, const char *ifname,
 		->returnValue().value.intValue;
 }
 
-int port_delete(const vplane_t *vp, uint32_t port, uint32_t ifindex)
+int port_delete(const vplane_t *vp, uint32_t port)
 {
 	return mock_c()->actualCall("port_delete")
 		->withPointerParameters("vp", (void *)vp)
 		->withIntParameters("port", port)
-		->withIntParameters("ifindex", ifindex)
 		->returnValue().value.intValue;
 }
 
@@ -576,7 +575,7 @@ TEST(request, funny_if_types)
 					 ifindex);
 
 		mock().expectOneCall("port_delete")
-			.withParameter("ifindex", (int)ifindex)
+			.withParameter("port", (int)ifno)
 			.ignoreOtherParameters()
 			.andReturnValue(0);
 		mock().expectOneCall("zmsg_send")
@@ -636,7 +635,7 @@ TEST(request, newport)
 	msg = test_build_delport(sessionid, seqno, ifno, raddr, ifindex);
 
 	mock().expectOneCall("port_delete")
-		.withParameter("ifindex", (int)ifindex)
+		.withParameter("port", (int)ifno)
 		.ignoreOtherParameters()
 		.andReturnValue(0);
 	mock().expectOneCall("zmsg_send")
@@ -689,7 +688,7 @@ TEST(request, addport)
 	msg = test_build_delport(sessionid, seqno, ifno, raddr, ifindex);
 
 	mock().expectOneCall("port_delete")
-		.withParameter("ifindex", (int)ifindex)
+		.withParameter("port", (int)ifno)
 		.ignoreOtherParameters()
 		.andReturnValue(0);
 	mock().expectOneCall("zmsg_send")
@@ -714,7 +713,7 @@ TEST(request, addport)
 	msg = test_build_delport(sessionid, seqno, ifno, raddr, 99);
 
 	mock().expectOneCall("port_delete")
-		.withParameter("ifindex", (int)99)
+		.withParameter("port", (int)ifno)
 		.ignoreOtherParameters()
 		.andReturnValue(0);
 	mock().expectOneCall("zmsg_send")
@@ -816,7 +815,7 @@ TEST(request, addport_errors)
 	msg = test_build_delport(sessionid, seqno, ifno, raddr, 0);
 
 	mock().expectOneCall("port_delete")
-		.withParameter("ifindex", (int)0)
+		.withParameter("port", (int)ifno)
 		.ignoreOtherParameters()
 		.andReturnValue(0);
 	mock().expectOneCall("zmsg_send")

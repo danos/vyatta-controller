@@ -272,10 +272,12 @@ int port_create(const vplane_t *vp, uint32_t port, const char *ifname,
  *  0 if successful
  * -1 if failed
  */
-int port_delete(const vplane_t *vp, uint32_t port,
-		uint32_t ifindex)
+int port_delete(const vplane_t *vp, uint32_t port)
 {
 	const char *ifname;
+	uint32_t ifindex;
+
+	ifindex = vplane_iface_get_ifindex(vp, port);
 
 	/* Is this dataplane running on the controller? */
 	if (vplane_is_local(vp) && ifindex == 0)

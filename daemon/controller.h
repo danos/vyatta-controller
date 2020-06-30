@@ -73,8 +73,7 @@ int port_create(const vplane_t *vp, uint32_t port,
 		const char *driver, const char *bus,
 		unsigned int if_flags, unsigned int mtu,
 		uint32_t *ifindex);
-int port_delete(const vplane_t *vp, uint32_t port,
-		uint32_t ifindex);
+int port_delete(const vplane_t *vp, uint32_t port);
 int port_state_change(const vplane_t *vp, uint32_t port, uint32_t ifindex,
 		      uint32_t operstate);
 int port_set_stats(const char *ifname, zframe_t *fr, bool aggregate, int dp_id);

@@ -734,7 +734,7 @@ static int newport_request(request_t *req, zmsg_t *msg)
  * Parse port deletion message.
  *   [1] <seqno>  64bit
  *   [2] <port> 32bit
- *   [3] <ifindex>  32bit
+ *   [3] <ifindex>  32bit (ignored)
  *   [4] <myip> ipv4/ipv6 address (ignored)
  */
 static int delport_request(request_t *req, zmsg_t *msg)
@@ -764,7 +764,7 @@ static int delport_request(request_t *req, zmsg_t *msg)
 		return -1;
 	}
 
-	int rc = port_delete(req->vp, req->portno, ifindex);
+	int rc = port_delete(req->vp, req->portno);
 
 	vplane_iface_del(req->vp, req->portno);
 	send_ifindex(req, rc, seqno);
@@ -1208,7 +1208,7 @@ static void snapshot_interface_purge(const vplane_t *vp, uint32_t ifn,
 done:
 	if (rc >= 0) {
 		action = "delete port after";
-		rc = port_delete(vp, ifn, ifindex);
+		rc = port_delete(vp, ifn);
 	}
 
 	vplane_iface_del((vplane_t *)vp, ifn);
