@@ -1,3 +1,12 @@
+vplane-controller (3.6.8) unstable; urgency=medium
+
+  [ Robert Shearman ]
+  * port: delete kernel interfaces for local vplanes
+  * request: actually delete the port when purging an interface
+  * request: don't require ifindex for DELPORT message
+
+ -- Mark Gillott <mgillott@vyatta.att-mail.com>  Wed, 01 Jul 2020 13:24:15 +0100
+
 vplane-controller (3.6.7) unstable; urgency=medium
 
   [ Nicholas Brown ]
