@@ -1,3 +1,11 @@
+vplane-controller (3.6.9) unstable; urgency=medium
+
+  [ Nicholas Brown ]
+  * Port to meson to better manage complex build dependencies and installation
+  * Add copyright/license header to all meson.build files
+
+ -- Mark Gillott <mgillott@vyatta.att-mail.com>  Tue, 07 Jul 2020 11:45:52 +0100
+
 vplane-controller (3.6.8) unstable; urgency=medium
 
   [ Robert Shearman ]
