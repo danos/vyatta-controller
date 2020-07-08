@@ -21,6 +21,7 @@ vplaned_library = library(
                 json_dep,
                 proto_c_dep,
                 b64_dep,
+                jemalloc_dep,
         ],
         install: true,
         soversion: 1

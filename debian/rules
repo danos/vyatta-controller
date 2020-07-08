@@ -17,8 +17,15 @@ export DEB_CFLAGS_MAINT_APPEND=-O3
 export DEB_CXXFLAGS_MAINT_APPEND=-O3
 endif
 
+ifneq (,$(filter pkg.vyatta-controller.jemalloc,$(DEB_BUILD_PROFILES)))
+USE_JEMALLOC="-Duse_jemalloc=enabled"
+endif
+
 %:
 	dh $@ --parallel --with systemd
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(USE_JEMALLOC)
 
 override_dh_strip:
 	dh_strip --dbg-package=vplane-controller-dbg

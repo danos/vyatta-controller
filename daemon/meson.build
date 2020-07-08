@@ -36,7 +36,8 @@ executable(
                 vrfmanager_dep,
                 systemd_dep,
                 zmq_dep,
-                proto_c_dep
+                proto_c_dep,
+                jemalloc_dep,
         ],
         install: true,
         install_dir : '/opt/vyatta/sbin'

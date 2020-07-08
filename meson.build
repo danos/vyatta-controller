@@ -26,6 +26,7 @@ vrfmanager_dep = dependency('libvrfmanager-vyatta')
 systemd_dep = dependency('libsystemd')
 proto_c_dep = dependency('libprotobuf-c')
 proto_cxx_dep = dependency('protobuf')
+jemalloc_dep = dependency('jemalloc', required : get_option('use_jemalloc'))
 
 cc = meson.get_compiler('c')
 b64_dep = cc.find_library('b64', required: true)

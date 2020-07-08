@@ -26,6 +26,7 @@ Build-Depends: debhelper (>= 9),
  golang-goprotobuf-dev,
  libprotobuf-dev,
  libvyatta-dataplane-proto-support,
+ libjemalloc-dev <pkg.vyatta-controller.jemalloc>
 Standards-Version: 4.3.0
 
 Package: libvplaned-dev
