@@ -1,3 +1,10 @@
+vplane-controller (3.6.10) unstable; urgency=medium
+
+  [ Nicholas Brown ]
+  * Add optional support for building vplaned with jemalloc
+
+ -- Mark Gillott <mgillott@vyatta.att-mail.com>  Fri, 17 Jul 2020 10:08:36 +0100
+
 vplane-controller (3.6.9) unstable; urgency=medium
 
   [ Nicholas Brown ]
