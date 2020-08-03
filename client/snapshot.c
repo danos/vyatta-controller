@@ -1,7 +1,7 @@
 /*
  * Vyatta Controller Snapshot Utility
  *
- * Copyright (c) 2017-2019, AT&T Intellectual Property. All rights reserved.
+ * Copyright (c) 2017-2020, AT&T Intellectual Property. All rights reserved.
  * Copyright (c) 2015-2016 by Brocade Communications Systems, Inc.
  * All rights reserved.
  *
@@ -300,6 +300,7 @@ static int dump_cstore(void)
 	while (!done && (zmsg = zmsg_recv(zsock)) != NULL) {
 		char *topic;
 		char *cmd;
+		char *p;
 		int64_t seqno;
 
 		if (debug)
@@ -316,10 +317,14 @@ static int dump_cstore(void)
 		 * the command itself (see
 		 * configdb.c:extract_topic()).
 		 */
-		if (done)
-			printf("[%"PRIi64"] %s\n", seqno, topic);
-		else
-			printf("[%"PRIi64"] %s\n", seqno, cmd);
+		printf("[%"PRIi64"] ", seqno);
+		for (p = done ? topic : cmd; *p != '\0'; p++) {
+			if (isprint(*p))
+				printf("%c", *p);
+			else
+				printf("\\x%02x", *p & 0xff);
+		}
+		printf("\n");
 
 		free(cmd);
 		free(topic);
