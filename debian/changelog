@@ -1,3 +1,10 @@
+vplane-controller (3.6.11) unstable; urgency=medium
+
+  [ Charles (Chas) Williams ]
+  * snapshot: decode binary messages as escaped hex
+
+ -- Mark Gillott <mgillott@vyatta.att-mail.com>  Mon, 03 Aug 2020 18:27:44 +0100
+
 vplane-controller (3.6.10) unstable; urgency=medium
 
   [ Nicholas Brown ]
