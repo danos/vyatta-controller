@@ -279,6 +279,125 @@ static int dump_netlink(int ifindex)
 	return sts;
 }
 
+static
+bool is_protobuf(char *p)
+{
+	/* We likely need a better heuristic. */
+	return !isprint(*p);
+}
+
+static
+void print_string(char *string, int len)
+{
+	char *p = string;
+	while (len--) {
+		if (isprint(*p))
+			printf("%c", *p);
+		else
+			printf("\\x%02x", *p & 0xff);
+		p++;
+	}
+}
+
+/* based on https://developers.google.com/protocol-buffers/docs/encoding */
+
+enum WireType {
+	Varint = 0,
+	Fixed64 = 1,
+	String = 2,
+	StartGroup = 3,
+	EndGroup = 4,
+	Fixed32 = 5,
+};
+
+static
+int decode_varint(char *p, int len, long *varintp)
+{
+	unsigned long varint = 0;
+	unsigned int shift = 0;
+	int consumed = 0;
+
+	while (len) {
+		unsigned long b = *p++ & 0xff;
+		len -= 1;
+		consumed += 1;
+
+		varint |= ((b & 0x7f) << shift);
+		shift += 7;
+
+		if (!(b & 0x80))
+			break;
+	}
+
+	*varintp = varint;
+	return consumed;
+}
+
+static
+void decode_pb(char *msg, int cmdlen)
+{
+	char *p = msg;
+	int wire_type;
+	unsigned int field_num;
+	long varint;
+	long fixed64;
+	int fixed32;
+	long sublen;
+	int consumed;
+
+	while (cmdlen > 0) {
+		consumed = decode_varint(p, cmdlen, &varint);
+		p += consumed;
+		cmdlen -= consumed;
+
+		wire_type = varint & 0x7;
+		field_num = varint >> 3;
+
+		switch (wire_type) {
+		case Varint:
+			consumed = decode_varint(p, cmdlen, &varint);
+			p += consumed;
+			cmdlen -= consumed;
+			printf("%u:%ld ", field_num, varint);
+			break;
+		case Fixed64:
+			memcpy(&fixed64, p, sizeof(fixed64));
+			p += sizeof(fixed64);
+			cmdlen -= sizeof(fixed64);
+			printf("%u:0x%lx ", field_num, fixed64);
+			break;
+		case Fixed32:
+			memcpy(&fixed32, p, sizeof(fixed32));
+			p += sizeof(fixed32);
+			cmdlen -= sizeof(fixed32);
+			printf("%u:0x%x ", field_num, fixed32);
+			break;
+		case String:
+			consumed = decode_varint(p, cmdlen, &sublen);
+			p += consumed;
+			cmdlen -= consumed;
+
+			/* possibly embedded messages */
+			if (is_protobuf(p)) {
+				printf("%u:{ ", field_num);
+				decode_pb(p, sublen);
+				printf("} ");
+			} else {
+				printf("%u:", field_num);
+				print_string(p, sublen);
+				printf(" ");
+			}
+
+			p += sublen;
+			cmdlen -= sublen;
+			break;
+		default:
+			fprintf(stderr, "unsupported protobuf wire type %d?\n", wire_type);
+			return;
+		}
+	}
+}
+
 static int dump_cstore(void)
 {
 	zsock_t *zsock = open_controller_dealer();
@@ -300,14 +419,15 @@ static int dump_cstore(void)
 	while (!done && (zmsg = zmsg_recv(zsock)) != NULL) {
 		char *topic;
 		char *cmd;
-		char *p;
 		int64_t seqno;
+		int cmdlen;
 
 		if (debug)
 			zmsg_dump(zmsg);
 
 		topic = zmsg_popstr(zmsg);
 		seqno = zmsg_popseqno(zmsg);
+		cmdlen = (int) zmsg_content_size(zmsg);
 		cmd = zmsg_popstr(zmsg);
 		done = streq(topic, "THATSALLFOLKS!");
 
@@ -318,11 +438,13 @@ static int dump_cstore(void)
 		 * configdb.c:extract_topic()).
 		 */
 		printf("[%"PRIi64"] ", seqno);
-		for (p = done ? topic : cmd; *p != '\0'; p++) {
-			if (isprint(*p))
-				printf("%c", *p);
+		if (done)
+			printf("%s", topic);
+		else {
+			if (is_protobuf(cmd))
+				decode_pb(cmd, cmdlen);
 			else
-				printf("\\x%02x", *p & 0xff);
+				printf("%s", cmd);
 		}
 		printf("\n");
 
