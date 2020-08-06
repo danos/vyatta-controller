@@ -1,3 +1,10 @@
+vplane-controller (3.6.12) unstable; urgency=medium
+
+  [ Charles (Chas) Williams ]
+  * snapshot: decode protobufs (Bugfix: VRVDR-47789)
+
+ -- Mark Gillott <mgillott@vyatta.att-mail.com>  Thu, 06 Aug 2020 08:00:40 +0100
+
 vplane-controller (3.6.11) unstable; urgency=medium
 
   [ Charles (Chas) Williams ]
