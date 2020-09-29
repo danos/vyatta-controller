@@ -3,7 +3,7 @@
  *
  * Collect SNMP run-time statistics from dataplane
  *
- * Copyright (c) 2017-2019, AT&T Intellectual Property.
+ * Copyright (c) 2017-2020, AT&T Intellectual Property.
  * All rights reserved.
  *
  * Copyright (c) 2014-2016 by Brocade Communications Systems, Inc.
@@ -873,6 +873,7 @@ static int process_json_stats(const char *json, const char *cmd)
 static int execute(zsock_t *sock, const char *cmd, const char *ep)
 {
 	int ret = 0;
+	char *data = NULL;
 
 	/* ignore blank lines */
 	if (*cmd == '\0')
@@ -904,14 +905,7 @@ static int execute(zsock_t *sock, const char *cmd, const char *ep)
 		goto end;
 	}
 
-	zframe_t *fr = zmsg_first(resp);
-	if (!fr) {
-		msg_stderr("missing response frame");
-		ret = -1;
-		goto end;
-	}
-
-	const char *data = (char *)zframe_data(fr);
+	data = zmsg_popstr(resp);
 	if (!data) {
 		msg_stderr("missing response data");
 		ret = -1;
@@ -923,6 +917,7 @@ static int execute(zsock_t *sock, const char *cmd, const char *ep)
 
 end:
 	free(status);
+	free(data);
 	zmsg_destroy(&resp);
 	return ret;
 }
