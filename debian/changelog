@@ -1,3 +1,10 @@
+vplane-controller (3.6.13) unstable; urgency=medium
+
+  [ Sharmila Podury ]
+  * snmp: JSON parse error on dataplane response
+
+ -- Mark Gillott <mgillott@vyatta.att-mail.com>  Tue, 20 Oct 2020 11:17:03 +0100
+
 vplane-controller (3.6.12) unstable; urgency=medium
 
   [ Charles (Chas) Williams ]
