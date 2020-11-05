@@ -103,6 +103,10 @@ int nl_generate_topic(const struct nlmsghdr *nlm, char *buf, size_t len,
 		      uint32_t *ifindex);
 
 void nl_propagate_nlmsg(nlmsg_t *nmsg);
+
+void nl_publisher_lock(void);
+void nl_publisher_unlock(void);
+
 const char *nlmsg_type_name_rtnl(const struct nlmsghdr *nlm);
 
 typedef struct _snapshot snapshot_t;

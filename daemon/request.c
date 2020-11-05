@@ -927,9 +927,16 @@ static int addport_request(request_t *req, zmsg_t *msg)
 	 * Now generate the shadow port and get hold of the resultant ifindex
 	 */
 	uint32_t ifindex;
+
+	/* Take publisher lock to make sure port create is completed
+	 * before netlink for new link is published
+	 */
+	nl_publisher_lock();
 	rc = port_create(req->vp, req->portno, ifname,
 			 &cookie->eth, cookie->driver, cookie->bus,
 			 cookie->if_flags, cookie->mtu, &ifindex);
+	nl_publisher_unlock();
+
 	dpport_cookie_destroy(&cookie);
 
 	if (rc < 0)

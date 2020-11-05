@@ -145,6 +145,18 @@ enum propagate_option {
 	PROPAGATE_BOTH,
 };
 
+static pthread_mutex_t nl_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void nl_publisher_lock(void)
+{
+	pthread_mutex_lock(&nl_mutex);
+}
+
+void nl_publisher_unlock(void)
+{
+	pthread_mutex_unlock(&nl_mutex);
+}
+
 static const char *propagate_option_string(enum propagate_option option)
 {
 	switch (option) {
@@ -187,9 +199,12 @@ static void __nl_propagate(nlmsg_t *nmsg, enum propagate_option option,
 		/* send copy to snapshot service */
 		nlmsg_send(nlmsg_copy(nmsg), request_ipc);
 
-	if (PROPAGATE_PUBLISH == option || PROPAGATE_BOTH == option)
+	if (PROPAGATE_PUBLISH == option || PROPAGATE_BOTH == option) {
+		nl_publisher_lock();
 		/* and publish original */
 		nlmsg_send(nmsg, publisher);
+		nl_publisher_unlock();
+	}
 }
 
 void nl_propagate_nlmsg(nlmsg_t *nmsg)

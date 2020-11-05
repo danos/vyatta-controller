@@ -78,6 +78,19 @@ nlmsg_t *nlmsg_recv(const char *topic, zmsg_t *msg)
 	CPPUTEST_STUB_RET_VAL(NULL);
 }
 
+
+static pthread_mutex_t nl_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void nl_publisher_lock(void)
+{
+	pthread_mutex_lock(&nl_mutex);
+}
+
+void nl_publisher_unlock(void)
+{
+	pthread_mutex_unlock(&nl_mutex);
+}
+
 void config_send(zsock_t *socket, zframe_t * to)
 
 {
