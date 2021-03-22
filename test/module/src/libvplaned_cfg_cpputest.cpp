@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019, AT&T Intellectual Property. All rights reserved.
+ * Copyright (c) 2018-2019, 2021 AT&T Intellectual Property. All rights reserved.
  * Copyright (c) 2016 by Brocade Communications Systems, Inc.
  * All rights reserved.
  *
@@ -161,7 +161,7 @@ TEST(libvplaned_cfg, request_response)
 	CHECK(vplaned_response_get(s, VPD_TIMEOUT, &resp) == 0);
 
 	jobj = json_tokener_parse(resp);
-	CHECK(!is_error(jobj));
+	CHECK(jobj != NULL);
 	json_object_put(jobj);
 	free(resp);
 
@@ -170,7 +170,7 @@ TEST(libvplaned_cfg, request_response)
 	CHECK(vplaned_response_get(s, VPD_TIMEOUT, &resp) == 0);
 
 	jobj = json_tokener_parse(resp);
-	CHECK(!is_error(jobj));
+	CHECK(jobj != NULL);
 	json_object_put(jobj);
 	free(resp);
 

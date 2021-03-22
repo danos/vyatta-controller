@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019, AT&T Intellectual Property.
+ * Copyright (c) 2018-2019, 2021 AT&T Intellectual Property.
  * All rights reserved.
  *
  * SPDX-License-Identifier: LGPL-2.1-only
@@ -73,7 +73,7 @@ jsonstr_object_equal(json_object *o1, json_object *o2)
 		return true;
 
 	case json_type_array:
-		int len, i;
+		size_t len, i;
 
 		len = json_object_array_length(o1);
 		if (len != json_object_array_length(o2))

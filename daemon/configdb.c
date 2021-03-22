@@ -3,7 +3,7 @@
  *  our configuration tree and commands to the dataplane. Sits
  *  behind the configstore interface.
  *
- * Copyright (c) 2018-2019, AT&T Intellectual Property. All rights reserved.
+ * Copyright (c) 2018-2019, 2021 AT&T Intellectual Property. All rights reserved.
  * Copyright (c) 2012-2015 by Brocade Communications Systems, Inc.
  * All rights reserved.
  *
@@ -16,7 +16,6 @@
 #include <string.h>
 #include <syslog.h>
 #include <json.h>
-#include <json_object_private.h>
 #include <linkhash.h>
 #include <czmq.h>
 #include "controller.h"
@@ -62,9 +61,23 @@ config_coll_free(struct lh_entry *e)
 	free(cv->_interface);
 
 	/* key is strdup'ed manually because json-c does not make a copy */
-	free(e->k);
+	free((void *)e->k);
 
 	free(cv);
+}
+
+/*
+ * API change (breakage). The json-c hash table name argument got
+ * dropped around version 0.13.x (see json-c:1ae4b50b)
+ */
+static inline lh_table *
+my_lh_kchar_table_new(int size, lh_entry_free_fn free_fn)
+{
+#if JSON_C_MINOR_VERSION > 13
+	return lh_kchar_table_new(size, free_fn);
+#else
+	return lh_kchar_table_new(size, "config_hash", free_fn);
+#endif
 }
 
 /*
@@ -79,8 +92,7 @@ create_config_node(char *key __unused)
 		err("failure to allocate memory");
 		return cv;
 	}
-	cv->_hash = lh_kchar_table_new(HASH_SIZE,
-				       "config_hash", config_coll_free);
+	cv->_hash = my_lh_kchar_table_new(HASH_SIZE, config_coll_free);
 	cv->_seq = -1;
 	cv->_topic = NULL;
 	cv->_value = NULL;
@@ -126,8 +138,11 @@ merge_json_to_db(lh_table *db, json_object *jobj, config_node_t *p_cv)
 	enum json_type type = json_object_get_type(jobj);
 	if (type == json_type_object) {
 		json_object_iter iter;
+		enum json_type itertype;
+
 		json_object_object_foreachC(jobj, iter) {
-			if (iter.val->o_type == json_type_string) {
+			itertype = json_object_get_type(iter.val);
+			if (itertype == json_type_string) {
 				if (strcmp(iter.key, DELETE_ACTION) == 0) { /* DELETE */
 					const char *cmd = json_object_get_string(iter.val);
 					add_cmd(p_cv, cmd);
@@ -198,7 +213,7 @@ merge_json_to_db(lh_table *db, json_object *jobj, config_node_t *p_cv)
 			 * Skip anything other than an object,
 			 * i.e. ignore the PROTOBUF "tag".
 			 */
-			if (iter.val->o_type != json_type_object)
+			if (itertype != json_type_object)
 				continue;
 
 			/* RECURSION, i.e. Object node */
@@ -214,8 +229,7 @@ merge_json_to_db(lh_table *db, json_object *jobj, config_node_t *p_cv)
 				p_cv = ((config_node_t *)e->v);
 				if (p_cv->_hash == NULL)
 					p_cv->_hash =
-						lh_kchar_table_new(HASH_SIZE,
-								   "config_hash",
+						my_lh_kchar_table_new(HASH_SIZE,
 								   config_coll_free);
 
 			}
@@ -233,8 +247,7 @@ update_db(json_object *jobj)
 {
 	if (!_root_config_coll)
 		_root_config_coll
-			= lh_kchar_table_new(HASH_SIZE,
-					     "config_hash", config_coll_free);
+			= my_lh_kchar_table_new(HASH_SIZE, config_coll_free);
 
 	flush_resync(); /* empty resync cache */
 	merge_json_to_db(_root_config_coll, jobj, NULL);

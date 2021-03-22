@@ -10,10 +10,16 @@ project('vyatta-controller', ['c', 'cpp'],
         ]
 )
 
+cc = meson.get_compiler('c')
 add_project_arguments(
         '-Wall', '-Wextra', '-Werror',
         '-Wmissing-prototypes', '-Wredundant-decls',
         '-D_GNU_SOURCE',
+        cc.get_supported_arguments([
+                '-Wno-stringop-overflow',
+                '-Wno-stringop-truncation',
+                '-Wno-format-truncation'
+        ]),
         language: 'c'
 )
 

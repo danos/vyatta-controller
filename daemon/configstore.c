@@ -4,7 +4,7 @@
  *  are to interpret single commands and to provide a snapshot
  *  of all commands during a resync request.
  *
- * Copyright (c) 2018-2019, AT&T Intellectual Property. All rights reserved.
+ * Copyright (c) 2018-2019, 2021 AT&T Intellectual Property. All rights reserved.
  * Copyright (c) 2017-2019 AT&T Intellectual Property. All rights reserved.
  * Copyright (c) 2012-2017 by Brocade Communications Systems, Inc.
  * All rights reserved.
@@ -50,7 +50,7 @@ int config_cmd(const char *line)
 	//parse json
 	enum json_tokener_error error = json_tokener_success;
 	json_object *jobj = json_tokener_parse_verbose(line, &error);
-	if (is_error(jobj)) {
+	if (jobj == NULL) {
 		err("json_tokener_parse error: %s, \"%s\"",
 		    json_tokener_error_desc(error), line);
 		return -1;
