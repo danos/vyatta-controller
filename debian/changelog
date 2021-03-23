@@ -1,3 +1,9 @@
+vplane-controller (3.7.0) unstable; urgency=medium
+
+  * json-c updated following move to debian bullsye (Fixes: VRVDR-54768)
+
+ -- Mark Gillott <mgillott@vyatta.att-mail.com>  Tue, 23 Mar 2021 09:56:55 +0000
+
 vplane-controller (3.6.14) unstable; urgency=medium
 
   [ Shweta Choudaha ]
