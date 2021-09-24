@@ -283,10 +283,12 @@ static int mroute_topic(const struct nlmsghdr *nlh, char *buf, size_t len,
 			const struct rtmsg *rtm)
 {
 	struct nlattr *tb[RTA_MAX+1] = { NULL };
-	int ifindex = 0, oifindex = 0;
+	int iifindex = 0, oifindex = 0;
 	const void *mcastgrp, *origin;
 	char b1[INET6_ADDRSTRLEN], b2[INET6_ADDRSTRLEN];
 	uint32_t table = rtm->rtm_table;
+	const char *mcastgrp_str;
+	const char *origin_str;
 
 	if (mnl_attr_parse(nlh, sizeof(*rtm), route_attr, tb) != MNL_CB_OK) {
 		notice("netlink: mroute_topic can't parse address attributes");
@@ -301,39 +303,57 @@ static int mroute_topic(const struct nlmsghdr *nlh, char *buf, size_t len,
 		return -1;
 	}
 
-	if (debug)
-		notice("netlink: route %s table %d\n",
-			nlh->nlmsg_type == RTM_NEWROUTE ? "new" : "delete",
-			table);
-
 	if (tb[RTA_DST])
 		mcastgrp = mnl_attr_get_payload(tb[RTA_DST]);
-	else {
+	else
 		mcastgrp = anyaddr;
-		notice("netlink: mroute_topic tb[RTA_DST] any");
-	}
 
 	if (tb[RTA_SRC])
 		origin = mnl_attr_get_payload(tb[RTA_SRC]);
-	else {
+	else
 		origin = anyaddr;
-		notice("netlink: mroute_topic tb[RTA_SRC] any");
-	}
 
 	if (tb[RTA_IIF])
-		ifindex = mnl_attr_get_u32(tb[RTA_IIF]);
+		iifindex = mnl_attr_get_u32(tb[RTA_IIF]);
 
-	if (tb[RTA_OIF]) {
+	if (tb[RTA_OIF])
 		oifindex = mnl_attr_get_u32(tb[RTA_OIF]);
-		notice("netlink: mroute_topic tb[RTA_OIF] %d", ifindex);
+
+	mcastgrp_str = mroute_ntop(rtm->rtm_family, mcastgrp, b1, sizeof(b1));
+	if (!mcastgrp_str)
+		mcastgrp_str = "";
+
+	origin_str = mroute_ntop(rtm->rtm_family, origin, b2, sizeof(b2));
+	if (!origin_str)
+		origin_str = "";
+
+	if (!iifindex && (nlh->nlmsg_type == RTM_NEWROUTE)) {
+		/*
+		 * An unresolved multicast route will be received as RTM_NEWROUTE but with
+		 * an RTA_IIF iifindex of zero. Later, if it is resolved, we will receive a
+		 * further RTM_NEWROUTE but with a valid non zero iifindex. However, both
+		 * messages have been saved to the snapshot. Hence, on replay, even if the
+		 * multicast route has been deleted, we will recreate the unresolved route.
+		 * Either we remove this unresolved route from the snapshot when we receive
+		 * an update, or we just ignore it. As I don't think the dataplane cares
+		 * about unresolved routes, as there is nothing to forward, I think we can
+		 * just ignore the unresolved message.
+		 */
+		dbg("ignore mroute table %d iifindex %d oifindex %d %s %s/%u %s/%u",
+				table, iifindex, oifindex, nl_route_type(rtm->rtm_type),
+				mcastgrp_str, rtm->rtm_dst_len, origin_str, rtm->rtm_src_len);
+		return -1;
 	}
 
+	dbg("mroute %s table %d iifindex %d oifindex %d %s %s/%u %s/%u",
+			nlh->nlmsg_type == RTM_NEWROUTE ? "new" : "delete",
+			table, iifindex, oifindex, nl_route_type(rtm->rtm_type),
+			mcastgrp_str, rtm->rtm_dst_len, origin_str, rtm->rtm_src_len);
+
 	return snprintf(buf, len, "route %d %d %s %s/%u %s/%u",
-			ifindex, oifindex, nl_route_type(rtm->rtm_type),
-			mroute_ntop(rtm->rtm_family, mcastgrp, b1, sizeof(b1)),
-			rtm->rtm_dst_len,
-			mroute_ntop(rtm->rtm_family, origin, b2, sizeof(b2)),
-			rtm->rtm_src_len);
+									iifindex, oifindex, nl_route_type(rtm->rtm_type),
+									mcastgrp_str, rtm->rtm_dst_len,
+									origin_str, rtm->rtm_src_len);
 }
 
 static int route_topic(const struct nlmsghdr *nlh, char *buf, size_t len)
