@@ -327,33 +327,35 @@ static int mroute_topic(const struct nlmsghdr *nlh, char *buf, size_t len,
 	if (!origin_str)
 		origin_str = "";
 
+	/*
+	 * An unresolved multicast route will be received as
+	 * RTM_NEWROUTE but with an RTA_IIF iifindex of zero. Later,
+	 * if it is resolved, we will receive a further RTM_NEWROUTE
+	 * but with a valid non zero iifindex. However, both messages
+	 * have been saved to the snapshot. Hence, on replay, even if
+	 * the multicast route has been deleted, we will recreate the
+	 * unresolved route.  Either we remove this unresolved route
+	 * from the snapshot when we receive an update, or we just
+	 * ignore it. As I don't think the dataplane cares about
+	 * unresolved routes, as there is nothing to forward, I think
+	 * we can just ignore the unresolved message.
+	 */
 	if (!iifindex && (nlh->nlmsg_type == RTM_NEWROUTE)) {
-		/*
-		 * An unresolved multicast route will be received as RTM_NEWROUTE but with
-		 * an RTA_IIF iifindex of zero. Later, if it is resolved, we will receive a
-		 * further RTM_NEWROUTE but with a valid non zero iifindex. However, both
-		 * messages have been saved to the snapshot. Hence, on replay, even if the
-		 * multicast route has been deleted, we will recreate the unresolved route.
-		 * Either we remove this unresolved route from the snapshot when we receive
-		 * an update, or we just ignore it. As I don't think the dataplane cares
-		 * about unresolved routes, as there is nothing to forward, I think we can
-		 * just ignore the unresolved message.
-		 */
 		dbg("ignore mroute table %d iifindex %d oifindex %d %s %s/%u %s/%u",
-				table, iifindex, oifindex, nl_route_type(rtm->rtm_type),
-				mcastgrp_str, rtm->rtm_dst_len, origin_str, rtm->rtm_src_len);
+		    table, iifindex, oifindex, nl_route_type(rtm->rtm_type),
+		    mcastgrp_str, rtm->rtm_dst_len, origin_str, rtm->rtm_src_len);
 		return -1;
 	}
 
 	dbg("mroute %s table %d iifindex %d oifindex %d %s %s/%u %s/%u",
-			nlh->nlmsg_type == RTM_NEWROUTE ? "new" : "delete",
-			table, iifindex, oifindex, nl_route_type(rtm->rtm_type),
-			mcastgrp_str, rtm->rtm_dst_len, origin_str, rtm->rtm_src_len);
+	    nlh->nlmsg_type == RTM_NEWROUTE ? "new" : "delete",
+	    table, iifindex, oifindex, nl_route_type(rtm->rtm_type),
+	    mcastgrp_str, rtm->rtm_dst_len, origin_str, rtm->rtm_src_len);
 
 	return snprintf(buf, len, "route %d %d %s %s/%u %s/%u",
-									iifindex, oifindex, nl_route_type(rtm->rtm_type),
-									mcastgrp_str, rtm->rtm_dst_len,
-									origin_str, rtm->rtm_src_len);
+			iifindex, oifindex, nl_route_type(rtm->rtm_type),
+			mcastgrp_str, rtm->rtm_dst_len,
+			origin_str, rtm->rtm_src_len);
 }
 
 static int route_topic(const struct nlmsghdr *nlh, char *buf, size_t len)
