@@ -1,3 +1,13 @@
+vplane-controller (3.7.1) unstable; urgency=medium
+
+  [ Neil McGill ]
+  * vplaned: ignore unresolved mroute netlink updates (Fixes: VRVDR-47352)
+
+  [ Mark Gillott ]
+  * vplaned: fixup indentation and formatting
+
+ -- Mark Gillott <mgillott@vyatta-att-mail.com>  Wed, 29 Sep 2021 11:23:13 +0100
+
 vplane-controller (3.7.0) unstable; urgency=medium
 
   * json-c updated following move to debian bullsye (Fixes: VRVDR-54768)
