@@ -4,8 +4,7 @@
  *  are to interpret single commands and to provide a snapshot
  *  of all commands during a resync request.
  *
- * Copyright (c) 2018-2019, 2021 AT&T Intellectual Property. All rights reserved.
- * Copyright (c) 2017-2019 AT&T Intellectual Property. All rights reserved.
+ * Copyright (c) 2018-2021 AT&T Intellectual Property. All rights reserved.
  * Copyright (c) 2012-2017 by Brocade Communications Systems, Inc.
  * All rights reserved.
  *
@@ -121,7 +120,7 @@ void send_intf_cmds(const char *ifname, uint64_t *msg_seq)
    Send single configuration command during resync
    operation.
 */
-static int publish_resync_cmd(void *s, void *morestuff)
+static int publish_resync_cmd(void *s, void *morestuff, bool send_db_key)
 {
 	command_node_t *cmd = (command_node_t *) s;
 	if (cmd == NULL || cmd->_node == NULL || morestuff == NULL)
@@ -164,6 +163,14 @@ static int publish_resync_cmd(void *s, void *morestuff)
 			return -1;
 		}
 
+		if (send_db_key) {
+			if (zstr_sendm(target->socket, cmd->_db_key)) {
+				err("zstr_sendm key failed: %s",
+				    strerror(errno));
+				return -1;
+			}
+		}
+
 		/* just create a frame and send.. */
 		zframe_t *frame = zframe_new(line, bin_len);
 		if (zframe_send(&frame, target->socket, 0)) {
@@ -189,6 +196,14 @@ static int publish_resync_cmd(void *s, void *morestuff)
 			return -1;
 		}
 
+		if (send_db_key) {
+			if (zstr_sendm(target->socket, cmd->_db_key)) {
+				err("zstr_sendm key failed: %s",
+				    strerror(errno));
+				return -1;
+			}
+		}
+
 		if (zstr_send(target->socket, cmd->_node->_value)) {
 			err("zstr_send failed: %s", strerror(errno));
 			return -1;
@@ -201,7 +216,7 @@ static int publish_resync_cmd(void *s, void *morestuff)
    Resync all configuration commands to requesting
    dataplane.
 */
-void config_send(zsock_t *socket, zframe_t * to)
+void config_send(zsock_t *socket, zframe_t * to, bool send_db_key)
 {
 	target_t t = { socket, to };
 	target_t *target = &t;
@@ -212,7 +227,7 @@ void config_send(zsock_t *socket, zframe_t * to)
 		command_node_t *c;
 		for (c = zlist_first(coll); c; c = zlist_next(coll))
 			if (!suppress_intf_cmd(c->_node->_interface))
-				publish_resync_cmd(c, target);
+				publish_resync_cmd(c, target, send_db_key);
 	}
 	pthread_mutex_unlock(&_mutex);
 }

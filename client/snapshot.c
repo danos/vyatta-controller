@@ -1,7 +1,7 @@
 /*
  * Vyatta Controller Snapshot Utility
  *
- * Copyright (c) 2017-2020, AT&T Intellectual Property. All rights reserved.
+ * Copyright (c) 2017-2021, AT&T Intellectual Property. All rights reserved.
  * Copyright (c) 2015-2016 by Brocade Communications Systems, Inc.
  * All rights reserved.
  *
@@ -427,6 +427,7 @@ static int dump_cstore(void)
 
 		topic = zmsg_popstr(zmsg);
 		seqno = zmsg_popseqno(zmsg);
+		free(zmsg_popstr(zmsg));	/* skip the database key */
 		cmdlen = (int) zmsg_content_size(zmsg);
 		cmd = zmsg_popstr(zmsg);
 		done = streq(topic, "THATSALLFOLKS!");

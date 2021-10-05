@@ -1,3 +1,11 @@
+/*
+ * Copyright (c) 2018-2021, AT&T Intellectual Property. All rights reserved.
+ * Copyright (c) 2013-2015 by Brocade Communications Systems, Inc.
+ * All rights reserved.
+ *
+ * SPDX-License-Identifier: LGPL-2.1-only
+ */
+
 #ifndef __CONFIGDB_H__
 #define __CONFIGDB_H__
 
@@ -16,6 +24,7 @@ typedef struct {
 	/* ACTION=DELETE, removed after publishing */
 	char	        *_ephemeral;
 	config_node_t	*_node;
+	char		*_db_key;
 } command_node_t;
 
 /* Function decls */

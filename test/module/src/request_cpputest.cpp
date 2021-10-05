@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020, AT&T Intellectual Property. All rights reserved.
+ * Copyright (c) 2018-2021, AT&T Intellectual Property. All rights reserved.
  * Copyright (c) 2015-2017 by Brocade Communications Systems, Inc.
  * All rights reserved.
  *
@@ -91,7 +91,7 @@ void nl_publisher_unlock(void)
 	pthread_mutex_unlock(&nl_mutex);
 }
 
-void config_send(zsock_t *socket, zframe_t * to)
+void config_send(zsock_t *socket, zframe_t * to, bool send_db_key)
 
 {
 	CPPUTEST_STUB_RET;

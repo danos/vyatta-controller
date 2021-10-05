@@ -1,7 +1,7 @@
 /*
  * Request socket handling thread.
  *
- * Copyright (c) 2018-2020, AT&T Intellectual Property. All rights reserved.
+ * Copyright (c) 2018-2021, AT&T Intellectual Property. All rights reserved.
  * Copyright (c) 2012-2017 by Brocade Communications Systems, Inc.
  * All rights reserved.
  *
@@ -1236,7 +1236,7 @@ static void do_snapshot(request_t *req, const char *who, bool skip_cstore)
 
 	snapshot_send(req->snap, req->sock, *req->envelope);
 	if (!skip_cstore)
-		config_send(req->sock, *req->envelope);
+		config_send(req->sock, *req->envelope, false);
 	send_eom(req);
 	info("%s END", who);
 }
@@ -1362,7 +1362,7 @@ static int cstore_dump(request_t *req, zmsg_t *msg __unused)
 	else
 		info("%s (%d) BEGIN", who, vpid);
 
-	config_send(req->sock, *req->envelope);
+	config_send(req->sock, *req->envelope, true);
 	send_eom(req);
 	info("%s END", who);
 	return 0;
