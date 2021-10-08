@@ -22,7 +22,7 @@ typedef struct {
 /* TODO roll LL and command_node_t into one w/ quicksort */
 typedef struct {
 	/* ACTION=DELETE, removed after publishing */
-	char	        *_ephemeral;
+	char		*_ephemeral;
 	config_node_t	*_node;
 	char		*_db_key;
 } command_node_t;
