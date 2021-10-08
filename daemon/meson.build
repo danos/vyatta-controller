@@ -2,6 +2,7 @@
 # Copyright (c) 2020, AT&T Intellectual Property.
 
 daemon_sources = files(
+        'bstr.c',
         'configcmd.c',
         'configdb.c',
         'configstore.c',
